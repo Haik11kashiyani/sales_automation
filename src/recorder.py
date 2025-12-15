@@ -43,9 +43,16 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
     print(f"Recording URL: {target_url} | Duration: {duration}s")
 
     async with async_playwright() as p:
+        # Launch with flags to bypass CORS and X-Frame-Options for universal Iframe support
         browser = await p.chromium.launch(
             headless=True,
-            args=['--enable-features=OverlayScrollbar', '--no-sandbox', '--disable-setuid-sandbox']
+            args=[
+                '--enable-features=OverlayScrollbar', 
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process'
+            ]
         )
         
         context = await browser.new_context(
