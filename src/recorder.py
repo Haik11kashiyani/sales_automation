@@ -14,14 +14,22 @@ async def record_url(url: str, duration: float, output_path: str):
     print(f"Starting recording for {url} with duration {duration}s")
     
     async with async_playwright() as p:
-        # Launch browser with specific viewport for Shorts (9:16)
+        # Launch browser
         browser = await p.chromium.launch(
-            headless=False  # We need xvfb for headless, using headful for now or xvfb in CI
+            headless=False,
+            args=['--enable-features=OverlayScrollbar'] # Optional: hide scrollbars overlay style
         )
         
-        # Create context with video recording enabled
+        # Create context with MOBILE Emulation
+        # We want 1080x1920 output.
+        # CSS Viewport: 360x640 (Standard Mobile)
+        # Scale Factor: 3.0
+        # Result: 360*3 = 1080, 640*3 = 1920.
         context = await browser.new_context(
-            viewport={"width": 1080, "height": 1920},
+            viewport={"width": 360, "height": 640},
+            device_scale_factor=3.0,
+            is_mobile=True,
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             record_video_dir=os.path.dirname(output_path),
             record_video_size={"width": 1080, "height": 1920}
         )
