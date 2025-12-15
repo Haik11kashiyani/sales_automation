@@ -66,13 +66,25 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         page = await context.new_page()
         
         # --- IFRAME HOST PAGE GENERATION ---
-        # We construct the Presentation UI *around* the iframe.
-        # The iframe 'src' is the actual site.
+        # "Universal Clean Layout" Strategy
+        # 1. Background: Dynamic/Dark.
+        # 2. Container: "Presentation Window" - A clean, sharp, maximized container.
+        # 3. Content: 100% Fit Iframe. No cutting.
         
-        # Constants for Scaling
-        MOBILE_W = 390
-        MOBILE_H = 844 # iPhone 12/13/14
-        SCALE_FACTOR = 2.3 # Fits 390 * 2.3 = ~897px width
+        # Dimensions for the "Virtual Browser"
+        # We want a modern mobile/tablet feel. 
+        # Width: 430px (iPhone Pro Max width) -> Scaled up to fill 1080p
+        # 1080px total. Margins 40px? -> 1000px targets.
+        # Scale: 1000 / 430 = 2.32
+        
+        VIRTUAL_W = 430 
+        SCALE_FACTOR = 2.3
+        CONTAINER_W = int(VIRTUAL_W * SCALE_FACTOR) # ~989px
+        
+        # Height: fill available space between Header and Footer
+        # Header ~200px. Footer ~250px. Total 1920.
+        # Available ~1400px.
+        CONTAINER_H = 1350 
         
         # Header/Footer Text Defaults
         header_txt = overlay_header if overlay_header else "WEB DESIGN AWARDS"
@@ -88,120 +100,117 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 body {{
                     margin: 0; padding: 0;
                     width: 1080px; height: 1920px;
-                    background: radial-gradient(circle at center, #1b1b1b, #000);
+                    background: #000;
                     color: white;
-                    font-family: 'Arial', sans-serif;
+                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
                     overflow: hidden;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
+                    justify-content: space-between; /* Header top, Footer bottom */
                 }}
                 
+                /* --- HEADER SECTION --- */
                 #header-group {{
-                    margin-top: 60px;
+                    margin-top: 80px;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     z-index: 10;
+                    height: 200px;
                 }}
                 
                 #p-header {{
-                    font-size: 40px; font-weight: bold; letter-spacing: 3px;
-                    color: #666; text-transform: uppercase;
+                    font-size: 35px; font-weight: 700; letter-spacing: 4px;
+                    color: #888; text-transform: uppercase;
                 }}
                 
                 #p-title {{
-                    font-size: 70px; font-weight: 900;
-                    background: linear-gradient(90deg, #fff, #aaa);
+                    font-size: 60px; font-weight: 900;
+                    text-align: center;
+                    background: linear-gradient(135deg, #fff 0%, #aaa 100%);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
-                    margin-top: 10px;
+                    margin-top: 15px;
+                    line-height: 1.1;
                 }}
                 
-                /* The Phone Wrapper */
-                #phone-wrapper {{
-                    margin-top: 60px;
+                /* --- PRESENTATION WINDOW (The "Screen") --- */
+                #presentation-window {{
                     position: relative;
-                    width: {MOBILE_W * SCALE_FACTOR}px;
-                    height: 1250px;
-                    /* Visual Border */
-                    border: 25px solid #222;
-                    border-radius: 50px;
-                    box-shadow: 0 0 100px rgba(0, 255, 136, 0.1);
-                    overflow: hidden;
-                    background: #000;
-                    flex-shrink: 0;
+                    width: {CONTAINER_W}px;
+                    height: {CONTAINER_H}px;
+                    
+                    /* Clean Window Styling - No Phone Artifacts */
+                    background: #fff;
+                    box-shadow: 0 20px 80px rgba(0,0,0,0.5); /* Deep shadow lift */
+                    overflow: hidden; /* No cutting -> Containment */
+                    
+                    /* Optional: Subtle rounded corners for modern "Card" feel? */
+                    /* User said "Central Squared fit". Let's keep it sharp or very minimal radius. */
+                    border-radius: 12px; 
+                    
+                    /* Border to define edges against dark bg */
+                    border: 1px solid #333;
                 }}
                 
-                /* The Iframe Itself */
                 #content-iframe {{
-                    width: {MOBILE_W}px;
-                    height: 100%; /* Will fill the scaled height? No, must trigger scroll. */
-                    height: {int(1250 / SCALE_FACTOR)}px; /* Logical height to fill frame? No, let's just make it 100% and scroll internal? */
-                    /* Better: Make iframe full height of the logic, transform it. */
-                    
-                    /* Actually, we want the iframe to be the 'window' */
-                    width: {MOBILE_W}px;
-                    height: 100%; 
+                    width: {VIRTUAL_W}px;
+                    height: {int(CONTAINER_H / SCALE_FACTOR)}px; /* Logical Height */
                     border: none;
                     background: #fff;
                     
                     transform: scale({SCALE_FACTOR});
                     transform-origin: top left;
                     
-                    /* Force Width to be exact logic pixels */
-                    /* Wait, if we scale the iframe element, its content scales. */
-                    /* But the container is large. */
+                    /* Ensure full rendering */
+                    display: block;
                 }}
                 
-                /* Better Approach: 
-                   Wrapper is 900px wide.
-                   Iframe is 390px wide.
-                   Transform Scale(2.3) makes Iframe 897px wide.
-                   We place Iframe inside Wrapper.
-                */
-                
+                /* --- FOOTER SECTION --- */
                 #footer-group {{
-                    margin-top: auto;
-                    margin-bottom: 80px;
+                    margin-bottom: 90px;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    gap: 20px;
+                    gap: 15px;
                     z-index: 10;
+                    height: 200px;
+                    justify-content: flex-end;
                 }}
                 
                  .cta-button {{
-                    background: linear-gradient(135deg, #0cebeb, #20e3b2, #29ffc6);
+                    background: #fff; /* High contrast */
                     color: #000;
-                    padding: 20px 70px;
-                    border-radius: 60px;
+                    padding: 25px 80px;
+                    border-radius: 4px; /* Sharp professional look */
                     font-weight: 900;
-                    font-size: 40px;
+                    font-size: 45px;
                     text-transform: uppercase;
-                    letter-spacing: 1px;
-                    box-shadow: 0 0 40px rgba(32, 227, 178, 0.5);
-                    animation: pulse-glow 2.5s infinite ease-in-out;
+                    letter-spacing: 2px;
+                    box-shadow: 0 10px 40px rgba(255, 255, 255, 0.2);
+                    animation: pulse-glow 3s infinite ease-in-out;
                 }}
                 
                 .cta-subtext {{
-                    font-size: 24px; color: #888; font-weight: bold;
-                    letter-spacing: 3px; text-transform: uppercase;
+                    font-size: 26px; color: #666; font-weight: 600;
+                    letter-spacing: 2px; text-transform: uppercase;
                 }}
                 
                 @keyframes pulse-glow {{
-                    0% {{ transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }}
-                    50% {{ transform: scale(1.03); box-shadow: 0 0 70px rgba(32, 227, 178, 0.7); }}
-                    100% {{ transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }}
+                    0% {{ transform: scale(1); }}
+                    50% {{ transform: scale(1.02); box-shadow: 0 10px 60px rgba(255, 255, 255, 0.4); }}
+                    100% {{ transform: scale(1); }}
                 }}
                 
                 #ai-cursor {{
                     position: absolute; top: 0; left: 0;
-                    width: 40px; height: 40px;
-                    background: rgba(0, 255, 136, 0.9);
-                    border: 3px solid white; border-radius: 50%;
+                    width: 32px; height: 32px;
+                    border-radius: 50%;
+                    background: rgba(255, 50, 50, 0.8); /* Highly visible interaction point */
+                    border: 3px solid white;
                     pointer-events: none; z-index: 9999;
-                    box-shadow: 0 0 15px rgba(0,255,136,0.6);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                     transition: transform 0.1s;
                 }}
             </style>
@@ -212,7 +221,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 <div id="p-title">{title_txt}</div>
             </div>
             
-            <div id="phone-wrapper">
+            <div id="presentation-window">
                 <iframe id="content-iframe" src="{target_url}" scrolling="yes"></iframe>
             </div>
             
@@ -224,14 +233,20 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             <div id="ai-cursor"></div>
             
             <script>
-                // Cursor Logic (Visual Only)
+                // Cursor Logic
                 const c = document.getElementById('ai-cursor');
                 document.addEventListener('mousemove', e => {{
                     c.style.left = e.clientX + 'px';
                     c.style.top = e.clientY + 'px';
                 }});
-                document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
-                document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
+                document.addEventListener('mousedown', () => {{
+                    c.style.transform = 'scale(0.8)';
+                    c.style.background = 'white';
+                }});
+                document.addEventListener('mouseup', () => {{
+                    c.style.transform = 'scale(1)';
+                    c.style.background = 'rgba(255, 50, 50, 0.8)';
+                }});
             </script>
         </body>
         </html>
