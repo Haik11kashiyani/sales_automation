@@ -101,14 +101,15 @@ async def record_url(file_path: str, duration: float, output_path: str):
             
             current_y = 0
             
+            # Interaction Config
+            interaction_interval = fps * 2 # Every 2 seconds approx
+            frames_since_interaction = 0
+            
             for frame in range(total_frames):
                 # Progress (0.0 to 1.0)
                 t = frame / total_frames
                 
-                # Easing function: EaseInOutCubic (Starts slow, speeds up, slows down)
-                # This mimics a human checking the top, scrolling fast through content, then slowing at footer.
-                # Formula: t < .5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2
-                
+                # Easing function: EaseInOutCubic
                 if t < 0.5:
                     ease = 4 * t * t * t
                 else:
@@ -125,6 +126,50 @@ async def record_url(file_path: str, duration: float, output_path: str):
                 if delta > 0:
                     await page.mouse.wheel(0, delta + jitter)
                     current_y += delta
+                
+                # --- INTERACTION LOGIC ---
+                # Every few seconds, move the mouse to "look" at something
+                frames_since_interaction += 1
+                if frames_since_interaction > interaction_interval:
+                    # Reset timer with some randomness
+                    frames_since_interaction = -random.randint(0, fps) 
+                    
+                    # 1. Find visible interactive elements in viewport
+                    # We inject JS to find elements relative to current scroll
+                    # Targets: buttons, links, inputs, canvases (3D), cards
+                    element_pos = await page.evaluate("""() => {
+                        const targets = Array.from(document.querySelectorAll('button, a, input, canvas, .card, .interactive'));
+                        const visible = targets.filter(t => {
+                            const rect = t.getBoundingClientRect();
+                            return rect.top >= 0 && rect.bottom <= window.innerHeight && rect.width > 0 && rect.height > 0;
+                        });
+                        
+                        if (visible.length > 0) {
+                            // Pick random one
+                            const update = visible[Math.floor(Math.random() * visible.length)];
+                            const rect = update.getBoundingClientRect();
+                            return {x: rect.x + rect.width/2, y: rect.y + rect.height/2, type: update.tagName};
+                        }
+                        return null;
+                    }""")
+                    
+                    if element_pos:
+                        # Smoothly move mouse to target
+                        # steps=20 makes it take ~0.3s (at 60fps) -> looks like human eye tracking
+                        await page.mouse.move(element_pos['x'], element_pos['y'], steps=25)
+                        
+                        # Interaction: Hover (Pause scroll slightly?)
+                        # If it's a Canvas (3D), do a wiggle
+                        if element_pos['type'] == 'CANVAS':
+                            # Wiggle mouse in circle for 3D effect
+                            cx, cy = element_pos['x'], element_pos['y']
+                            for w in range(10):
+                                wx = cx + math.sin(w) * 50
+                                wy = cy + math.cos(w) * 50
+                                await page.mouse.move(wx, wy, steps=2)
+                        
+                        # Just hover for a bit
+                        await page.wait_for_timeout(500 + random.randint(0, 500))
                 
                 await page.wait_for_timeout(1000/fps)
                 
