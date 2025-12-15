@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-to-Reality Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <style>
+        :root {
+            --primary: #00ff88;
+            --bg: #0a0a0a;
+            --text: #ffffff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border_box;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+        
+        section {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        h1 {
+            font-size: 4rem;
+            text-align: center;
+            background: linear-gradient(45deg, var(--primary), #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2rem;
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        
+        p {
+            font-size: 1.5rem;
+            text-align: center;
+            max-width: 600px;
+            margin-bottom: 3rem;
+            opacity: 0;
+            transform: translateY(30px);
+            line-height: 1.6;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 1rem;
+            width: 80%;
+            opacity: 0;
+            transform: scale(0.8);
+            backdrop-filter: blur(10px);
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            width: 100%;
+        }
+        
+        .cta-btn {
+            background: var(--primary);
+            color: #000;
+            padding: 1rem 3rem;
+            border-radius: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-decoration: none;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: transform 0.3s ease;
+        }
+        
+        .cta-btn:hover {
+            transform: scale(1.1) !important;
+        }
+        
+        .floating-orb {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--primary), transparent 70%);
+            border-radius: 50%;
+            opacity: 0.2;
+            z-index: -1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <section id="hero">
+        <div class="floating-orb" style="top: 10%; right: -10%;"></div>
+        <h1 class="hero-title">Future of Web</h1>
+        <p class="hero-text">Experience the next generation of digital presence. Fast. Fluid. Flawless.</p>
+    </section>
+
+    <section id="features">
+        <h1 class="feature-title">Why Us?</h1>
+        <div class="feature-grid">
+            <div class="card feature-card">
+                <h3>Lightning Fast</h3>
+                <p style="font-size: 1rem; margin-top: 1rem;">Optimized for speed and performance.</p>
+            </div>
+            <div class="card feature-card">
+                <h3>AI Powered</h3>
+                <p style="font-size: 1rem; margin-top: 1rem;">Built with intelligent automation.</p>
+            </div>
+            <div class="card feature-card">
+                <h3>Beautiful Design</h3>
+                <p style="font-size: 1rem; margin-top: 1rem;">Aesthetics that capture attention.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="cta">
+        <div class="floating-orb" style="bottom: 10%; left: -10%;"></div>
+        <h1 class="cta-title">Ready to Launch?</h1>
+        <p class="cta-text">Don't settle for average. Get a website that sells itself.</p>
+        <a href="#" class="cta-btn">Start Now</a>
+        <p style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">haikkashiyani.kesug.com</p>
+    </section>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+        
+        // Hero Animation
+        gsap.to(".hero-title", {
+            opacity: 1,
+            y: 0,
+            duration: 1,
+            ease: "power4.out"
+        });
+        
+        gsap.to(".hero-text", {
+            opacity: 1,
+            y: 0,
+            duration: 1,
+            delay: 0.3,
+            ease: "power4.out"
+        });
+        
+        // Features Animation
+        gsap.utils.toArray(".feature-card").forEach((card, i) => {
+            gsap.to(card, {
+                scrollTrigger: {
+                    trigger: "#features",
+                    start: "top center",
+                    toggleActions: "play none none reverse"
+                },
+                opacity: 1,
+                scale: 1,
+                duration: 0.8,
+                delay: i * 0.2,
+                ease: "back.out(1.7)"
+            });
+        });
+        
+        gsap.to(".feature-title", {
+            scrollTrigger: {
+                trigger: "#features",
+                start: "top 70%",
+            },
+            opacity: 1,
+            y: 0,
+            duration: 1
+        });
+        
+        // CTA Animation
+        gsap.to(".cta-title", {
+            scrollTrigger: {
+                trigger: "#cta",
+                start: "top 60%",
+            },
+            opacity: 1,
+            y: 0,
+            duration: 1
+        });
+        
+        gsap.to(".cta-text", {
+            scrollTrigger: {
+                trigger: "#cta",
+                start: "top 60%",
+            },
+            opacity: 1,
+            y: 0,
+            duration: 1,
+            delay: 0.2
+        });
+        
+        gsap.to(".cta-btn", {
+            scrollTrigger: {
+                trigger: "#cta",
+                start: "top 60%",
+            },
+            opacity: 1,
+            scale: 1,
+            duration: 0.5,
+            delay: 0.5,
+            ease: "elastic.out(1, 0.3)"
+        });
+        
+        // Floating Orbs
+        gsap.to(".floating-orb", {
+            y: 50,
+            duration: 2,
+            yoyo: true,
+            repeat: -1,
+            ease: "sine.inOut"
+        });
+    </script>
+</body>
+</html>
