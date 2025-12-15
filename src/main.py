@@ -29,6 +29,9 @@ def main():
             except:
                 previous_history = []
     
+    # Get list of folders
+    folders = get_content_folders()
+    
     # Sort folders to ensure deterministic order (optional)
     folders.sort()
     
