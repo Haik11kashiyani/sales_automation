@@ -71,26 +71,30 @@ def main():
     voiceover = os.path.join(OUTPUT_DIR, f"voice_{folder}.mp3")
     final_video = os.path.join(OUTPUT_DIR, f"final_{folder}.mp4")
     
-    # 1. Generate Audio
-    duration = 0
+    # 1. Read Script Data
+    script_data = {}
     if os.path.exists(script_json):
+        with open(script_json, 'r') as f:
+            script_data = json.load(f)
         duration = generate_voiceover(script_json, voiceover)
     else:
         print(f"No script.json found for {folder}, skipping.")
         return
-        
+
+    # Extract Metadata
+    overlay_text = script_data.get("overlay_text", "")
+    overlay_header = script_data.get("overlay_header", "")
+    
     if duration <= 0:
         print("Audio generation failed or returned 0 duration.")
         # Fallback
-        with open(script_json, 'r') as f:
-            d = json.load(f)
-            duration = d.get("video_duration_override", 30)
-            print(f"Using fallback duration: {duration}s")
+        duration = script_data.get("video_duration_override", 30)
+        print(f"Using fallback duration: {duration}s")
 
     # 2. Record Video
     if os.path.exists(index_html):
         # We run the async recorder
-        asyncio.run(record_url(index_html, duration, raw_video))
+        asyncio.run(record_url(index_html, duration, raw_video, overlay_text=overlay_text, overlay_header=overlay_header))
     else:
             print(f"No index.html found for {folder}")
             return

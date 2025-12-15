@@ -31,7 +31,7 @@ def run_server_in_thread():
 
 # --- Recorder Logic ---
 
-async def record_url(file_path: str, duration: float, output_path: str):
+async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = ""):
     """
     Records a webpage interaction via localhost:
     1. Launches browser (Mobile Emulation)
@@ -81,106 +81,201 @@ async def record_url(file_path: str, duration: float, output_path: str):
              await page.goto(url)
 
         # --- FIX RENDERING & INJECT CURSOR ---
+        # --- PRESENTATION MODE: MOCKUP WRAPPER ---
+        # Instead of scaling the body, we Wrap the existing content in a Phone Mockup.
+        
+        # 1. Inject Styles for the Wrapper
         await page.add_style_tag(content="""
+            /* Hide the original body scrollbar first, we will scroll the inner frame */
             html, body {
-                width: 360px; /* Force Logical Mobile Width */
-                min-height: 100vh;
+                width: 100%;
+                height: 100%;
                 margin: 0;
                 padding: 0;
+                overflow: hidden; /* No window scroll */
+                background: #000;
+            }
+            
+            /* The Container that fills the 1080x1920 video */
+            #presentation-container {
+                position: fixed;
+                top: 0; 
+                left: 0;
+                width: 1080px;
+                height: 1920px;
+                background: radial-gradient(circle at center, #1a1a1a 0%, #000 70%);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 99990; /* Below cursor, above content? No, we wrap content. */
+                font-family: 'Arial', sans-serif;
+                color: #fff;
+            }
+            
+            /* Header Text */
+            #presentation-header {
+                font-size: 40px;
+                font-weight: bold;
+                letter-spacing: 2px;
+                margin-bottom: 40px;
+                text-transform: uppercase;
+                color: #888;
+            }
+            
+            #presentation-title {
+                 font-size: 60px;
+                 font-weight: 800;
+                 margin-bottom: 60px;
+                 text-align: center;
+                 background: linear-gradient(90deg, #fff, #888);
+                 -webkit-background-clip: text;
+                 -webkit-text-fill-color: transparent;
+            }
+            
+            /* The Phone Mockup Frame */
+            #mockup-frame {
+                width: 700px;  /* 360 * 2ish? Fits widely */
+                height: 1100px; /* 16:9ish */
+                background: #000;
+                border: 20px solid #222;
+                border-radius: 40px;
+                box-shadow: 0 0 100px rgba(0, 255, 136, 0.2);
+                overflow: hidden; /* Clip content */
+                position: relative;
+            }
+            
+            /* The Content Wrapper inside the phone */
+            /* We will move the original BODY content into this div */
+            #mockup-content {
+                width: 100%;
+                height: 100%;
+                overflow-y: scroll; /* Scrollable inside */
                 overflow-x: hidden;
+                background: #0a0a0a;
             }
             
-            /* The Magic: Scale everything up 3x to fill 1080px width */
-            body {
-                transform: scale(3.0);
-                transform-origin: top left;
-                overflow-y: visible; /* Let it scroll */
-                background-color: #0a0a0a;
+            /* Hide scrollbars in mockup */
+            #mockup-content::-webkit-scrollbar { display: none; }
+            
+            /* Footer */
+            #presentation-footer {
+                margin-top: 60px;
+                background: #fff;
+                color: #000;
+                padding: 15px 40px;
+                border-radius: 50px;
+                font-weight: bold;
+                font-size: 30px;
             }
-            
-            /* Fix fixed elements (like background orbs) */
-            .floating-orb {
-                 /* They usually relate to body, so they scale with it. Good. */
-            }
-            
-            /* Hide scrollbars */
-            ::-webkit-scrollbar { display: none; }
-            
-            /* AI CURSOR IS OUTSIDE THE SCALE TRANSFORM (Fixed to viewport) */
-            /* We inject it as a direct child of html or outside body if possible, 
-               but simpler to make it inverse-scaled or just big?
-               If body is scaled, cursor inside body is scaled.
-               Let's put cursor in body and let it be scaled 3x automatically. 
-               So 15px cursor -> 45px visual. perfect.
-            */
+
+            /* AI Cursor */
             #ai-cursor {
-                position: absolute; /* Absolute relative to doc, not fixed to viewport if we scroll? */
-                /* If we scroll page, body moves up. If cursor is fixed, it stays. */
-                /* Wait, transform on body might mess up fixed positioning context. */
+                position: fixed;
                 top: 0; left: 0;
-                width: 15px;
-                height: 15px;
+                width: 40px;
+                height: 40px;
                 background: rgba(0, 255, 136, 0.9);
-                border: 2px solid white;
+                border: 3px solid white;
                 border-radius: 50%;
                 pointer-events: none;
                 z-index: 999999;
                 transition: transform 0.1s;
-                box-shadow: 0 0 10px rgba(0,255,136,0.6);
+                box-shadow: 0 0 20px rgba(0,255,136,0.6);
             }
         """)
         
-        # Inject cursor div
-        await page.evaluate("""
+        # 2. Re-structure the DOM
+        # We need to take all children of body and move them into #mockup-content
+        # Then put #mockup-content inside #mockup-frame inside #presentation-container
+        
+        js_injection = f"""
+            // Create the wrapper structure
+            const container = document.createElement('div');
+            container.id = 'presentation-container';
+            
+            const header = document.createElement('div');
+            header.id = 'presentation-header';
+            header.innerText = "{overlay_header if overlay_header else 'WEB DESIGN AWARDS'}";
+            
+            const title = document.createElement('div');
+            title.id = 'presentation-title';
+            title.innerText = "{overlay_text if overlay_text else 'THE POWER OF SIMPLICITY'}";
+            
+            const frame = document.createElement('div');
+            frame.id = 'mockup-frame';
+            
+            const innerContent = document.createElement('div');
+            innerContent.id = 'mockup-content';
+            
+            const footer = document.createElement('div');
+            footer.id = 'presentation-footer';
+            footer.innerText = 'DAILY INSPIRATION';
+            
+            // Assemble
+            frame.appendChild(innerContent);
+            
+            container.appendChild(header);
+            container.appendChild(title);
+            container.appendChild(frame);
+            container.appendChild(footer);
+            
+            // Move existing body content
+            while (document.body.firstChild) {{
+                innerContent.appendChild(document.body.firstChild);
+            }}
+            
+            document.body.appendChild(container);
+            
+            // Add Cursor
             const c = document.createElement('div');
             c.id = 'ai-cursor';
             document.body.appendChild(c);
             
-            // Sync cursor with mouse events
-            // PROBLEM: Mouse events in Playwright are in Viewport Pixels (0-1080).
-            // But Body is 360px wide (Scaled 3x).
-            // If we move mouse to 540 (Screen Center), that equates to Body x=180.
-            // If the cursor is inside the body, we must set its left/top to logical pixels (0-360).
-            
-            document.addEventListener('mousemove', e => {
-                // e.clientX is Viewport X (0-1080).
-                // We need to place #ai-cursor at logical position (0-360).
-                // So divide by 3.
-                c.style.left = (e.pageX / 3) + 'px'; 
-                c.style.top = (e.pageY / 3) + 'px';
-            });
+            // Cursor Sync
+            document.addEventListener('mousemove', e => {{
+                c.style.left = e.clientX + 'px';
+                c.style.top = e.clientY + 'px';
+            }});
             document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
             document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
-        """)
+            
+            // Force Font Scale on Inner Content to look like mobile
+            // Since frame is 700px wide, and mobile is usually 360-ish.
+            // 700 / 360 = ~2x. 
+            innerContent.style.fontSize = '200%'; 
+        """
+        
+        await page.evaluate(js_injection)
+        
+        # Helper function for text overlay logic.
+        pass
 
         # Force GSAP refresh
-        await page.evaluate("if(window.ScrollTrigger) window.ScrollTrigger.refresh()")
+        await page.evaluate("""
+            if(window.ScrollTrigger) {
+                // ScrollTrigger usually listens to window. 
+                // We need to tell it to listen to #mockup-content
+                ScrollTrigger.defaults({ scroller: "#mockup-content" });
+                ScrollTrigger.refresh();
+            }
+        """)
         await page.wait_for_timeout(1000)
         
-        # --- LOGIC UPDATE: Use Viewport Pixels (0-1080) for Playwright Mouse ---
-        # The page layout is 360px logical. But Playwright controls the "Window" (1080px).
-        # When we move mouse to x=540, the browser hits x=180 on the scaled body. Matches perfectly.
-        
-        # Get POIs. `getBoundingClientRect` on scaled elements returns VIEWPORT coordinates (0-1080).
-        # So our logic remains mostly same!
+        # --- LOGIC UPDATE: Target the MOCKUP CONTENT ---
         
         pois = await page.evaluate("""() => {
-            const targets = Array.from(document.querySelectorAll('button, a, input, canvas, .card, .interactive, h1, h2, video'));
+            // We search inside the mockup content
+            const container = document.getElementById('mockup-content');
+            const targets = Array.from(container.querySelectorAll('button, a, input, canvas, .card, .interactive, h1, h2, video'));
+            
             return targets.map(t => {
                 const r = t.getBoundingClientRect();
+                // r is relative to Viewport (Window).
+                // Since container is fixed, this works for targeting!
+                // But specifically for sorting default order...
                 return {
-                    y: r.top + window.scrollY,
-                    // Window scroll Y is usually in viewport pixels? No, logical.
-                    // Actually, let's just use absolute page offset.
-                    
-                    // Safer: getBoundingClientRect().top + window.scrollY
-                    // If body is scaled, valid scroll height is HUGE or SMALL?
-                    // If 360px wide body is scaled 3x... total scroll height is logical (360 based) or visual?
-                    // Usually CSS transform doesn't affect scrollWidth/Height report of documentElement?
-                    // Let's assume standard behavior:
-                    // We will rely on r.top (Viewport relative) + scrollY (current scroll).
-                    
-                    y: r.top + window.scrollY,
+                    y: r.top + container.scrollTop, // Position relative to content top
                     height: r.height,
                     type: t.tagName,
                     classList: Array.from(t.classList).join(' '),
@@ -190,44 +285,32 @@ async def record_url(file_path: str, duration: float, output_path: str):
             }).sort((a, b) => a.y - b.y);
         }""")
         
-        # We need to scroll the *Viewport*. 
-        # Total height of document?
-        total_height = await page.evaluate("document.body.scrollHeight") 
-        # With scale(3), content is visually huge. scrollHeight might be native (e.g. 2000px).
-        # But visually it occupies 6000px.
-        # Playwright mouse.wheel(0, 100) scrolls 100 viewport pixels usually.
+        total_height = await page.evaluate("document.getElementById('mockup-content').scrollHeight") 
+        viewport_height = 1100 # Height of #mockup-frame
         
-        # Let's adjust viewport_height logic.
-        viewport_height = 1920 
         current_scroll = 0
         start_time = time.time()
         
-        # Initial Mouse Move
+        # Initial Mouse Move to Mockup Center
         await page.mouse.move(540, 960) 
         
-        # We scroll until we think we reached bottom.
-        # Let's trust visual detection.
-        while True: # Loop until timeout or max scroll
-            current_idx = await page.evaluate("window.scrollY")
-            total = await page.evaluate("document.body.scrollHeight") # Logical height?
-            # If body is scaled, the browser might report logical height?
-            # Actually with transform on body, the WINDOW scroll bar might disappear or change?
-            # We set `overflow-y: visible` on body and `overflow` on html... 
+        loop_count = 0
+        while True:
+            # 1. Get current scroll of the container
+            current_scroll_pos = await page.evaluate("document.getElementById('mockup-content').scrollTop")
             
-            # SCROLL STRATEGY:
-            # We scroll, then check if scrollY changed. If not, we are at bottom.
+            # 2. Identify POIs visible within the frame
+            # The frame is roughly at Top: 250px (est), Height: 1100px.
+            # We can use getBoundingClientRect() to check visibility.
             
-            # Identify Next Target
-            # Filter POIs visible in current Viewport (0 to 1920 relative to scroll)
-            # Actually pois.y includes scrollY.
-            
-            # Re-read positions relative to viewport for interactions
-            # This is safer than maintaining state.
             visible_targets = await page.evaluate("""() => {
-                const targets = Array.from(document.querySelectorAll('button, a, .card, .interactive, canvas'));
+                const targets = Array.from(document.querySelectorAll('#mockup-content button, #mockup-content a, #mockup-content .card, #mockup-content .interactive, #mockup-content canvas'));
+                const frameRect = document.getElementById('mockup-frame').getBoundingClientRect();
+                
                 return targets.map(t => {
                      const r = t.getBoundingClientRect();
-                     if (r.top > 100 && r.bottom < 1800) { // Visible in 1080x1920 frame
+                     // Check if inside frame bounds
+                     if (r.top > frameRect.top && r.bottom < frameRect.bottom) {
                          return {
                              x: r.left + r.width/2,
                              y: r.top + r.height/2,
@@ -239,13 +322,13 @@ async def record_url(file_path: str, duration: float, output_path: str):
                 }).filter(t => t !== null);
             }""")
             
-            # INTERACTION CHANCE
-            if len(visible_targets) > 0 and random.random() < 0.6:
+            should_interact = False
+            if len(visible_targets) > 0 and random.random() < 0.65:
+                 should_interact = True
+
+            if should_interact:
                 target = random.choice(visible_targets)
-                
-                # Move Mouse (Human Curve)
-                start_pt = await page.evaluate("({x: 540, y: 960})") # Pseudo center? no
-                # Just move from current mouse pos (maintained by PW)
+                # Move Mouse
                 await page.mouse.move(target['x'], target['y'], steps=random.randint(10, 20))
                 
                 # Action based on type
@@ -259,25 +342,20 @@ async def record_url(file_path: str, duration: float, output_path: str):
                     await page.mouse.up()
                 else:
                     await page.wait_for_timeout(random.randint(200, 500)) # Hover
-                    
-            # SCROLL STEP
-            step = random.randint(30, 100) # Viewport pixels
+            
+            # SCROLL STEP - WE MUST SCROLL THE ELEMENT via JS because wheel scrolls window usually (unless focused)
+            # Actually page.mouse.wheel usually scrolls the element under cursor.
+            # Let's ensure cursor is over frame.
+            await page.mouse.move(540, 960) # Center
+            
+            step = random.randint(50, 150)
             await page.mouse.wheel(0, step)
-            await page.wait_for_timeout(random.randint(20, 50))
+            await page.wait_for_timeout(random.randint(30, 80))
             
-            # Check exit
-            new_scroll = await page.evaluate("window.scrollY")
-            if new_scroll == current_idx and current_idx > 0:
-                 # Stuck = Bottom? or stuck top?
-                 # If we tried to scroll 10 times and didn't move...
-                 pass # Simple logic: just rely on time or scrollHeight
-            
+            loop_count += 1
             if time.time() - start_time > duration + 5:
-                # Force one last big scroll to ensure footer
-                await page.mouse.wheel(0, 1000)
-                await page.wait_for_timeout(1000)
-                break
-             
+                 break
+                 
         await context.close()
         await browser.close()
         
