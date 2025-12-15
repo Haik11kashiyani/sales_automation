@@ -21,7 +21,7 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r yt_automation_engine/requirements.txt
+        pip install -r requirements.txt
         
     - name: Install Playwright Browsers
       run: |
@@ -39,10 +39,10 @@ jobs:
         
         # Start virtual display (xvfb) just in case
         sudo apt-get install -y xvfb
-        xvfb-run --auto-servernum --server-args="-screen 0 1080x1920x24" python yt_automation_engine/src/main.py
+        xvfb-run --auto-servernum --server-args="-screen 0 1080x1920x24" python src/main.py
         
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: generated-shorts
-        path: yt_automation_engine/output/*.mp4
+        path: output/*.mp4
