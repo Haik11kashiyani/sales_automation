@@ -383,19 +383,55 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         # Initial Mouse Move
         await page.mouse.move(540, 960) 
         
+        # --- NAVIGATION & INTERACTION LOGIC ---
+        
+        # 1. Identify "Hamburger" or Menu buttons explicitly for mobile
+        nav_targets = await page.evaluate("""() => {
+            const candidates = Array.from(document.querySelectorAll('nav button, [aria-label="menu"], .hamburger, .menu-toggle, #nav-toggle'));
+            return candidates.map(t => {
+                const r = t.getBoundingClientRect();
+                return {
+                    x: r.left + r.width/2,
+                    y: r.top + r.height/2,
+                    type: 'NAV'
+                };
+            });
+        }""")
+        
+        # Interaction Loop
         while True:
-            current_idx = await page.evaluate("window.scrollY")
+            current_scroll_y = await page.evaluate("window.scrollY")
             
-            # Identify Next Target
+            # A. NAV INTERACTION (Happens occasionally if visible)
+            if len(nav_targets) > 0 and random.random() < 0.15: # 15% chance to toggle menu
+                 # Check if nav is visible (sticky or at top)
+                 # Simpler: just pick one and try if it looks valid
+                 nt = random.choice(nav_targets)
+                 # Verify it's in viewport (targets are static rects? No, nav moves if sticky.)
+                 # Let's re-eval nav position
+                 valid_nav = await page.evaluate("""(x, y) => {
+                     const el = document.elementFromPoint(x, y);
+                     return el && (el.tagName === 'BUTTON' || el.closest('button') || el.closest('nav'));
+                 }""", nt['x'], nt['y'])
+                 
+                 if valid_nav:
+                     await page.mouse.move(nt['x'], nt['y'], steps=20)
+                     await page.mouse.down()
+                     await page.wait_for_timeout(100)
+                     await page.mouse.up()
+                     await page.wait_for_timeout(1500) # Let menu animation play
+                     # Click again to close? Or scroll away.
+                     if random.random() > 0.5:
+                         await page.mouse.down()
+                         await page.wait_for_timeout(100)
+                         await page.mouse.up()
+                         await page.wait_for_timeout(500)
+
+            # B. STANDARD INTERACTION
             visible_targets = await page.evaluate("""() => {
-                const targets = Array.from(document.querySelectorAll('button, a, .card, .interactive, canvas'));
-                // Frame is roughly 250 to 1550 Y visually?
-                // Viewport is 0-1920.
-                
+                const targets = Array.from(document.querySelectorAll('button, a, .card, .interactive, canvas, input'));
                 return targets.map(t => {
                      const r = t.getBoundingClientRect();
-                     // Check if valid target
-                     // We prefer targets near center of screen (where the phone is)
                      if (r.top > 250 && r.bottom < 1550) { 
                          return {
                              x: r.left + r.width/2,
@@ -409,35 +445,35 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             }""")
             
             should_interact = False
-            if len(visible_targets) > 0 and random.random() < 0.65:
+            if len(visible_targets) > 0 and random.random() < 0.7:
                  should_interact = True
 
             if should_interact:
                 target = random.choice(visible_targets)
                 # Move Mouse
-                await page.mouse.move(target['x'], target['y'], steps=random.randint(10, 20))
+                await page.mouse.move(target['x'], target['y'], steps=random.randint(10, 25))
                 
                 # Action based on type
                 if target['type'] == 'CANVAS':
+                    # Drag interaction for WebGL
                     await page.mouse.down()
-                    await page.mouse.move(target['x'] + 100, target['y'], steps=15)
+                    await page.mouse.move(target['x'] + random.randint(-100, 100), target['y'] + random.randint(-50, 50), steps=15)
                     await page.mouse.up()
-                elif 'btn' in target['cls'] or target['type'] == 'BUTTON':
+                elif 'btn' in target['cls'] or target['type'] == 'BUTTON' or target['type'] == 'A':
+                    # Click interaction
                     await page.mouse.down()
-                    await page.wait_for_timeout(50)
+                    await page.wait_for_timeout(random.randint(50, 150))
                     await page.mouse.up()
                 else:
-                    await page.wait_for_timeout(random.randint(200, 500)) # Hover
+                    await page.wait_for_timeout(random.randint(300, 800)) # Hover / Read
             
-            # SCROLL STEP - Scroll WINDOW
-            # Since body is transformed, does window scroll amount map 1:1?
-            # No, if body is scaled 2.2x, 100px scroll might look like 220px? Or 100px?
-            # It usually scrolls the viewport logical pixels. 
-            step = random.randint(50, 150)
+            # C. SCROLL STEP
+            step = random.randint(50, 200) # Variable speed
             await page.mouse.wheel(0, step)
-            await page.wait_for_timeout(random.randint(30, 80))
+            await page.wait_for_timeout(random.randint(50, 100)) # Pause to "read"
             
-            if time.time() - start_time > duration + 5:
+            # End Condition: Time or Bottom
+            if time.time() - start_time > duration + 8: # Add buffer
                  break
                  
         await context.close()
