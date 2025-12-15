@@ -59,16 +59,13 @@ async def record_url(file_path: str, duration: float, output_path: str):
         )
         
         # Mobile Emulation setup
-        # Switching to "Phablet" Logical Resolution to fix "Cornered/Narrow" look.
-        # Logical: 540x960
-        # Scale: 2.0
-        # Output: 1080x1920
+        # STRATEGY CHANGE: Native 1080x1920 Viewport with CSS Zoom.
+        # This guarantees the video fills the frame 100% without scaling artifacts.
         context = await browser.new_context(
-            viewport={"width": 540, "height": 960},
-            device_scale_factor=2.0,
-            is_mobile=True,
+            viewport={"width": 1080, "height": 1920},
+            device_scale_factor=1.0,
+            is_mobile=False, # We strictly control layout via CSS/Meta
             has_touch=True,
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             record_video_dir=os.path.dirname(output_path),
             record_video_size={"width": 1080, "height": 1920}
         )
@@ -81,24 +78,32 @@ async def record_url(file_path: str, duration: float, output_path: str):
              await page.goto(url)
 
         # --- FIX RENDERING & INJECT CURSOR ---
-        # 1. Force full width
-        # 2. Add a FAKE CURSOR so the user can see the "Human" interaction! 
-        #    (Playwright mouse is invisible, adding a visual dot helps sell the effect)
+        # 1. Force Mobile Layout via Zoom implies width ~360px (1080 / 3 = 360)
+        # 2. Add Cursor
         await page.add_style_tag(content="""
-            html, body { width: 100%; margin: 0; padding: 0; overflow-x: hidden; }
+            html {
+                zoom: 300%; /* Force Mobile View on 1080p screen */
+                overflow-x: hidden;
+            }
+            body { 
+                margin: 0; 
+                padding: 0; 
+                background-color: #0a0a0a; /* Ensure no white bars */
+            }
             ::-webkit-scrollbar { display: none; }
             
             #ai-cursor {
                 position: fixed;
-                width: 20px;
-                height: 20px;
-                background: rgba(0, 255, 136, 0.7);
-                border: 2px solid white;
+                width: 15px; /* Smaller because of zoom */
+                height: 15px;
+                background: rgba(0, 255, 136, 0.9);
+                border: 1px solid white;
                 border-radius: 50%;
                 pointer-events: none;
                 z-index: 999999;
                 transition: transform 0.1s;
-                mix-blend-mode: difference;
+                mix-blend-mode: normal;
+                box-shadow: 0 0 10px rgba(0,255,136,0.5);
             }
         """)
         
@@ -109,9 +114,11 @@ async def record_url(file_path: str, duration: float, output_path: str):
             document.body.appendChild(c);
             
             // Sync cursor with mouse events
+            // visual cursor needs to counteract zoom for smooth look? 
+            // actually playright mouse events are logical, zoom handles the rest.
             document.addEventListener('mousemove', e => {
-                c.style.left = (e.clientX - 10) + 'px';
-                c.style.top = (e.clientY - 10) + 'px';
+                c.style.left = e.clientX + 'px';
+                c.style.top = e.clientY + 'px';
             });
             document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
             document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
@@ -131,6 +138,7 @@ async def record_url(file_path: str, duration: float, output_path: str):
                     y: r.top + window.scrollY,
                     height: r.height,
                     type: t.tagName,
+                    classList: Array.from(t.classList).join(' '),
                     centerX: r.left + r.width/2,
                     centerY: r.top + r.height/2
                 };
@@ -138,69 +146,84 @@ async def record_url(file_path: str, duration: float, output_path: str):
         }""")
         
         total_height = await page.evaluate("document.body.scrollHeight")
-        viewport_height = 960
+        # Logical height will be lower due to zoom? No, scrollHeight reports Scaled pixels usually.
+        # Let's verify: 1080x1920 zoom 300% -> Viewport effectively 360x640 logical.
+        # We need to scroll based on logical pixels.
+        
+        viewport_height = 640 # logic viewport (1920 / 3)
         current_scroll = 0
         start_time = time.time()
         
-        # Initial "Look around"
-        await page.mouse.move(270, 480, steps=20) 
+        # Cursor Start
+        await page.mouse.move(180, 320) # Center of logical 360x640
         
         while current_scroll < (total_height - viewport_height):
-            # Dynamic Speed: Fast Flick vs Slow Read
-            
-            # Check interaction zone
-            visible_pois = [p for p in pois if p['y'] > current_scroll and p['y'] < (current_scroll + viewport_height - 100)]
+            # Identify POIs
+            look_ahead = current_scroll + 200
+            visible_pois = [p for p in pois if p['y'] > current_scroll and p['y'] < (current_scroll + viewport_height - 50)]
             
             should_interact = False
-            if len(visible_pois) > 0 and random.random() < 0.7:
+            if len(visible_pois) > 0 and random.random() < 0.75:
                  should_interact = True
             
             if should_interact:
-                # --- INTERACTION MODE ---
-                # Scroll a tiny bit, then play with element
                 target = random.choice(visible_pois)
                 mouse_y_target = target['centerY'] - current_scroll
                 
-                # Check bounds
-                if 100 < mouse_y_target < 860:
-                    # 1. Scroll check (Micro scroll to align?)
-                    # 2. Move Mouse Fast (Human Flick)
-                    await page.mouse.move(target['centerX'], mouse_y_target, steps=random.randint(5, 12))
+                # Bounds check (Logical Viewport)
+                if 50 < mouse_y_target < 590:
+                    # Move Cursor (Human Curve)
+                    await page.mouse.move(target['centerX'], mouse_y_target, steps=random.randint(8, 15))
                     
-                    # 3. Hover / Wiggle
-                    if target['type'] == 'CANVAS':
-                         # 3D Rotate
-                         start_x = target['centerX']
-                         for _ in range(10):
-                             await page.mouse.move(start_x + random.randint(-40, 40), mouse_y_target + random.randint(-40, 40), steps=2)
+                    # --- DISTINCT INTERACTIONS ---
+                    tag = target['type']
+                    cls = target['classList']
+                    
+                    if tag == 'CANVAS':
+                         # 3D ROTATE (Drag)
+                         await page.mouse.down()
+                         await page.mouse.move(target['centerX'] + 50, mouse_y_target, steps=10)
+                         await page.mouse.up()
+                         await page.mouse.move(target['centerX'], mouse_y_target, steps=10) # Return
+                         
+                    elif tag == 'BUTTON' or 'btn' in cls:
+                         # CLICK HOVER (Bounce)
+                         await page.wait_for_timeout(100)
+                         await page.mouse.down() # Click
+                         await page.wait_for_timeout(100)
+                         await page.mouse.up()
+                         await page.wait_for_timeout(400) # Admire result
+                         
+                    elif 'card' in cls or tag == 'DIV':
+                         # READ/FOCUS (Slow Pan)
+                         # Pan across the card
+                         start_x = target['centerX'] - 20
+                         end_x = target['centerX'] + 20
+                         await page.mouse.move(start_x, mouse_y_target, steps=20)
+                         await page.mouse.move(end_x, mouse_y_target, steps=20)
+                    
                     else:
-                         # Button Hover
-                         await page.wait_for_timeout(random.randint(400, 900))
-                    
-                    # 4. Resume
+                         # GENERIC HOVER
+                         await page.wait_for_timeout(random.randint(300, 600))
                 
-                # Slow Scroll (Reading/Viewing)
-                step = random.randint(30, 80)
+                # Resume Scroll (Slow)
+                step = random.randint(20, 60)
                 await page.mouse.wheel(0, step)
                 current_scroll += step
                 await page.wait_for_timeout(random.randint(50, 150))
                 
             else:
-                # --- FAST SKIM MODE (Sloopy Fix) ---
-                # User complaining about "Sloopy" (Slow/Sloppy). They want "Fast & Fluid".
-                # We do a 'Flick' (large scroll) + Glide
-                flick_power = random.randint(300, 600)
-                
-                # Execute Flick (Exponential Decceleration)
+                # FAST SKIM (Flick)
+                flick_power = random.randint(200, 500)
                 remaining = flick_power
                 while remaining > 10:
-                    chunk = int(remaining * 0.3) # Move 30% of remaining distance
+                    chunk = int(remaining * 0.25)
                     await page.mouse.wheel(0, chunk)
                     current_scroll += chunk
                     remaining -= chunk
-                    await page.wait_for_timeout(16) # 60fps
+                    await page.wait_for_timeout(16)
                 
-                await page.wait_for_timeout(random.randint(50, 100))
+                await page.wait_for_timeout(random.randint(30, 80))
 
             if time.time() - start_time > duration + 5:
                 break
