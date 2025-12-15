@@ -428,11 +428,13 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                          await page.wait_for_timeout(500)
 
             # B. STANDARD INTERACTION
+            # Improved to include Header, Footer, Nav, and structural elements
             visible_targets = await page.evaluate("""() => {
-                const targets = Array.from(document.querySelectorAll('button, a, .card, .interactive, canvas, input'));
+                const targets = Array.from(document.querySelectorAll('header, footer, nav, button, a, .card, .interactive, canvas, input, h1, h2, section'));
                 return targets.map(t => {
                      const r = t.getBoundingClientRect();
-                     if (r.top > 250 && r.bottom < 1550) { 
+                     // Check if it's reasonably visible in the "Phone Frame" zone (Visual Y: 250-1550)
+                     if (r.top > 200 && r.bottom < 1600) { 
                          return {
                              x: r.left + r.width/2,
                              y: r.top + r.height/2,
@@ -445,7 +447,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             }""")
             
             should_interact = False
-            if len(visible_targets) > 0 and random.random() < 0.7:
+            if len(visible_targets) > 0 and random.random() < 0.75: # High interaction rate
                  should_interact = True
 
             if should_interact:
@@ -455,25 +457,27 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 
                 # Action based on type
                 if target['type'] == 'CANVAS':
-                    # Drag interaction for WebGL
+                    # Drag for WebGL
                     await page.mouse.down()
                     await page.mouse.move(target['x'] + random.randint(-100, 100), target['y'] + random.randint(-50, 50), steps=15)
                     await page.mouse.up()
-                elif 'btn' in target['cls'] or target['type'] == 'BUTTON' or target['type'] == 'A':
-                    # Click interaction
+                elif target['type'] in ['BUTTON', 'A', 'INPUT'] or 'btn' in target['cls']:
+                    # Click
                     await page.mouse.down()
                     await page.wait_for_timeout(random.randint(50, 150))
                     await page.mouse.up()
                 else:
-                    await page.wait_for_timeout(random.randint(300, 800)) # Hover / Read
+                    # Header/Footer/Text -> Hover & Read
+                    await page.wait_for_timeout(random.randint(300, 600)) 
             
             # C. SCROLL STEP
-            step = random.randint(50, 200) # Variable speed
+            # Ensure we eventually reach the footer if it exists
+            step = random.randint(60, 220) 
             await page.mouse.wheel(0, step)
-            await page.wait_for_timeout(random.randint(50, 100)) # Pause to "read"
+            await page.wait_for_timeout(random.randint(40, 90))
             
-            # End Condition: Time or Bottom
-            if time.time() - start_time > duration + 8: # Add buffer
+            # End Condition: Time
+            if time.time() - start_time > duration + 8:
                  break
                  
         await context.close()
