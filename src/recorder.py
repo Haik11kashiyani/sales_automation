@@ -108,12 +108,11 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                z-index: 99990; /* Below cursor, above content? No, we wrap content. */
+                z-index: 99990; 
                 font-family: 'Arial', sans-serif;
                 color: #fff;
             }
             
-            /* Header Text */
             #presentation-header {
                 font-size: 40px;
                 font-weight: bold;
@@ -135,30 +134,48 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             
             /* The Phone Mockup Frame */
             #mockup-frame {
-                width: 700px;  /* 360 * 2ish? Fits widely */
-                height: 1100px; /* 16:9ish */
+                width: 750px;  /* Fits nicely in 1080px */
+                height: 1200px; /* Tall Aspect Ratio */
                 background: #000;
                 border: 20px solid #222;
                 border-radius: 40px;
                 box-shadow: 0 0 100px rgba(0, 255, 136, 0.2);
                 overflow: hidden; /* Clip content */
                 position: relative;
+                
+                /* Alignment for the scaled content */
+                display: flex;
+                align-items: flex-start;
+                justify-content: flex-start;
             }
             
             /* The Content Wrapper inside the phone */
-            /* We will move the original BODY content into this div */
             #mockup-content {
-                width: 100%;
-                height: 100%;
-                overflow-y: scroll; /* Scrollable inside */
+                /* VITAL FIX: Set Width to True Mobile Size (375px) */
+                width: 375px;
+                height: 600px; /* 1200 / 2 = 600px logical height */
+                /* But wait, if we scale(2), height visually doubles. */
+                /* If we want the scrollable area to fill the frame... */
+                /* We set width: 375px. */
+                /* Transform scale(2). */
+                /* The height of this container should be large enough? */
+                /* Actually, simpler: */
+                
+                width: 375px; 
+                height: 600px; /* Initial visual height */
+                min-height: 100%;
+                
+                transform: scale(2.0);
+                transform-origin: top left;
+                
+                overflow-y: scroll; 
                 overflow-x: hidden;
                 background: #0a0a0a;
             }
             
-            /* Hide scrollbars in mockup */
+            /* Scrollbar hiding on the logical element */
             #mockup-content::-webkit-scrollbar { display: none; }
             
-            /* Footer / Creative CTA Area */
             #presentation-footer {
                 margin-top: 50px;
                 display: flex;
@@ -215,7 +232,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 100% { left: 200%; }
             }
 
-            /* AI Cursor */
             #ai-cursor {
                 position: fixed;
                 top: 0; left: 0;
@@ -231,7 +247,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             }
         """)
         
-        # 2. Re-structure the DOM
         js_injection = f"""
             // Create the wrapper structure
             const container = document.createElement('div');
@@ -294,8 +309,10 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
             document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
             
-            // Force Font Scale on Inner Content to look like mobile
-            innerContent.style.fontSize = '200%'; 
+            // Apply Fix for Mobile Scaling
+            // We force the inner content to be strictly 375px wide.
+            // This triggers mobile media queries.
+            // The transform in CSS scales it up to fill the 750px frame.
         """
         
         await page.evaluate(js_injection)
