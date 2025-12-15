@@ -37,9 +37,21 @@ jobs:
         # However, for some WebGL/GPU stuff, purely headless might differ.
         # We'll use the python script directly.
         
+    - name: Run Automation Engine
+      env:
+        ELEVENLABS_API_KEYS: ${{ secrets.ELEVENLABS_API_KEYS }}
+      run: |
         # Start virtual display (xvfb) just in case
         sudo apt-get install -y xvfb
         xvfb-run --auto-servernum --server-args="-screen 0 1080x1920x24" python src/main.py
+
+    - name: Commit Schedule History
+      run: |
+        git config --global user.name 'Automated Scheduler'
+        git config --global user.email 'scheduler@bot.com'
+        git add data/history.json
+        git commit -m "update: history.json [skip ci]" || echo "No history changes"
+        git push
         
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4

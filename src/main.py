@@ -19,7 +19,8 @@ def main():
         os.makedirs(OUTPUT_DIR)
 
     previous_history = []
-    history_file = os.path.join(OUTPUT_DIR, "history.json")
+    # Persistent history file in 'data' folder (must be committed)
+    history_file = os.path.join(BASE_DIR, "data", "history.json")
     
     if os.path.exists(history_file):
         with open(history_file, 'r') as f:
