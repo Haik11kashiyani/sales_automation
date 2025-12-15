@@ -81,11 +81,40 @@ def main():
         print(f"No script.json found for {folder}, skipping.")
         return
 
+from creative import generate_viral_hooks
+
+    # ... (existing code) ...
+
     # Extract Metadata
+    # 1. Start with Script Defaults (base source of truth)
     overlay_text = script_data.get("overlay_text", "")
     overlay_header = script_data.get("overlay_header", "")
-    cta_text = script_data.get("cta_text", "GET STARTED")
-    cta_subtext = script_data.get("cta_subtext", "LINK IN BIO")
+    cta_text = script_data.get("cta_text", "")
+    cta_subtext = script_data.get("cta_subtext", "")
+    
+    # 2. Apply Creative Engine (Variety Injection)
+    # We pass the narration text to the AI to generate relevant hooks
+    # If script.json has explicit values, we might want to keep them OR override them for variety.
+    # Strategy: If values are empty OR we want forced variety, call generator.
+    # Let's assume we ALWAYS call generator to fill in blanks or add variety if script defaults are generic.
+    
+    narration_preview = script_data.get("narration", "")
+    viral_hooks = generate_viral_hooks(narration_preview)
+    
+    # Priority: Script.json > AI/Creative > Default
+    # Actually user wants "different for each short". So Creative > Script?
+    # Let's do: If script.json has value, use it (manual override). Else use Creative.
+    # UNLESS user enables "FORCE_VARIETY" flag.
+    # For now, let's auto-fill if empty, or mix. 
+    # User said "add generated those text".
+    
+    if not overlay_text: overlay_text = viral_hooks.get("overlay_text")
+    if not overlay_header: overlay_header = viral_hooks.get("overlay_header")
+    if not cta_text: cta_text = viral_hooks.get("cta_text")
+    if not cta_subtext: cta_subtext = viral_hooks.get("cta_subtext")
+    
+    # Log the hooks for this run
+    print(f"🎬 VIDEO METADATA:\nHeader: {overlay_header}\nTitle: {overlay_text}\nCTA: {cta_text}\nSub: {cta_subtext}")
     
     if duration <= 0:
         print("Audio generation failed or returned 0 duration.")
