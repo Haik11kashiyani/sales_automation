@@ -78,32 +78,44 @@ async def record_url(file_path: str, duration: float, output_path: str):
              await page.goto(url)
 
         # --- FIX RENDERING & INJECT CURSOR ---
-        # 1. Force Mobile Layout via Zoom implies width ~360px (1080 / 3 = 360)
-        # 2. Add Cursor
+        # 1. Force Mobile Layout via Root Font Scaling (300% = 3x size for REM units)
+        #    This is safer than 'zoom' which causes overflow/clipping issues.
+        #    It makes 1080px behave like a ~360px wide screen for REM-based layouts.
         await page.add_style_tag(content="""
             html {
-                zoom: 300%; /* Force Mobile View on 1080p screen */
+                font-size: 300%; /* Scale all REM units 3x */
+                width: 100%;
                 overflow-x: hidden;
             }
             body { 
                 margin: 0; 
                 padding: 0; 
-                background-color: #0a0a0a; /* Ensure no white bars */
+                background-color: #0a0a0a;
+                width: 100%;
             }
+            
+            /* Ensure Grids stack vertically */
+            .feature-grid {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+            }
+            
+            /* Hide scrollbars */
             ::-webkit-scrollbar { display: none; }
             
             #ai-cursor {
                 position: fixed;
-                width: 15px; /* Smaller because of zoom */
-                height: 15px;
+                width: 40px; /* Larger to match scaled UI */
+                height: 40px; 
                 background: rgba(0, 255, 136, 0.9);
-                border: 1px solid white;
+                border: 3px solid white;
                 border-radius: 50%;
                 pointer-events: none;
                 z-index: 999999;
                 transition: transform 0.1s;
                 mix-blend-mode: normal;
-                box-shadow: 0 0 10px rgba(0,255,136,0.5);
+                box-shadow: 0 0 20px rgba(0,255,136,0.6);
             }
         """)
         
