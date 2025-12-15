@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,20 +13,20 @@
             --bg: #0a0a0a;
             --text: #ffffff;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border_box;
             font-family: 'Inter', sans-serif;
         }
-        
+
         body {
             background-color: var(--bg);
             color: var(--text);
             overflow-x: hidden;
         }
-        
+
         section {
             height: 100vh;
             display: flex;
@@ -35,7 +36,7 @@
             padding: 2rem;
             position: relative;
         }
-        
+
         h1 {
             font-size: 4rem;
             text-align: center;
@@ -46,7 +47,7 @@
             opacity: 0;
             transform: translateY(50px);
         }
-        
+
         p {
             font-size: 1.5rem;
             text-align: center;
@@ -56,7 +57,7 @@
             transform: translateY(30px);
             line-height: 1.6;
         }
-        
+
         .card {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -68,14 +69,14 @@
             transform: scale(0.8);
             backdrop-filter: blur(10px);
         }
-        
+
         .feature-grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 2rem;
             width: 100%;
         }
-        
+
         .cta-btn {
             background: var(--primary);
             color: #000;
@@ -88,11 +89,11 @@
             transform: scale(0.5);
             transition: transform 0.3s ease;
         }
-        
+
         .cta-btn:hover {
             transform: scale(1.1) !important;
         }
-        
+
         .floating-orb {
             position: absolute;
             width: 300px;
@@ -102,31 +103,49 @@
             opacity: 0.2;
             z-index: -1;
         }
-
     </style>
 </head>
+
 <body>
 
     <section id="hero">
         <div class="floating-orb" style="top: 10%; right: -10%;"></div>
         <h1 class="hero-title">Future of Web</h1>
         <p class="hero-text">Experience the next generation of digital presence. Fast. Fluid. Flawless.</p>
+
+        <!-- Interactive 3D Mockup -->
+        <canvas id="hero-canvas" class="interactive" width="300" height="300"
+            style="background: rgba(255,255,255,0.05); border-radius: 20px; margin-bottom: 2rem; cursor: pointer;"></canvas>
     </section>
 
     <section id="features">
         <h1 class="feature-title">Why Us?</h1>
         <div class="feature-grid">
-            <div class="card feature-card">
+            <div class="card feature-card interactive" style="cursor: pointer;">
                 <h3>Lightning Fast</h3>
                 <p style="font-size: 1rem; margin-top: 1rem;">Optimized for speed and performance.</p>
+                <button class="interactive-btn"
+                    style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); border:none; border-radius:5px; cursor:pointer;">Learn
+                    More</button>
             </div>
-            <div class="card feature-card">
+            <div class="card feature-card interactive" style="cursor: pointer;">
                 <h3>AI Powered</h3>
                 <p style="font-size: 1rem; margin-top: 1rem;">Built with intelligent automation.</p>
+                <button class="interactive-btn"
+                    style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); border:none; border-radius:5px; cursor:pointer;">See
+                    AI</button>
             </div>
-            <div class="card feature-card">
+            <div class="card feature-card interactive" style="cursor: pointer;">
                 <h3>Beautiful Design</h3>
                 <p style="font-size: 1rem; margin-top: 1rem;">Aesthetics that capture attention.</p>
+                <div class="color-swatches" style="display:flex; gap:10px; margin-top:1rem;">
+                    <span class="interactive"
+                        style="width:20px; height:20px; background:red; border-radius:50%;"></span>
+                    <span class="interactive"
+                        style="width:20px; height:20px; background:blue; border-radius:50%;"></span>
+                    <span class="interactive"
+                        style="width:20px; height:20px; background:green; border-radius:50%;"></span>
+                </div>
             </div>
         </div>
     </section>
@@ -135,13 +154,32 @@
         <div class="floating-orb" style="bottom: 10%; left: -10%;"></div>
         <h1 class="cta-title">Ready to Launch?</h1>
         <p class="cta-text">Don't settle for average. Get a website that sells itself.</p>
-        <a href="#" class="cta-btn">Start Now</a>
+        <a href="#" class="cta-btn interactive">Start Now</a>
         <p style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">haikkashiyani.kesug.com</p>
     </section>
 
     <script>
         gsap.registerPlugin(ScrollTrigger);
-        
+
+        // --- 3D Canvas Mockup (Rotating Cube Effect) ---
+        const canvas = document.getElementById('hero-canvas');
+        const ctx = canvas.getContext('2d');
+        let rotation = 0;
+
+        function drawCube() {
+            ctx.clearRect(0, 0, 300, 300);
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.save();
+            ctx.translate(150, 150);
+            ctx.rotate(rotation);
+            ctx.strokeRect(-50, -50, 100, 100);
+            ctx.restore();
+            rotation += 0.01;
+            requestAnimationFrame(drawCube);
+        }
+        drawCube();
+
         // Hero Animation
         gsap.to(".hero-title", {
             opacity: 1,
@@ -149,7 +187,7 @@
             duration: 1,
             ease: "power4.out"
         });
-        
+
         gsap.to(".hero-text", {
             opacity: 1,
             y: 0,
@@ -157,7 +195,16 @@
             delay: 0.3,
             ease: "power4.out"
         });
-        
+
+        gsap.to("#hero-canvas", {
+            opacity: 1,
+            scale: 1,
+            duration: 1,
+            delay: 0.5,
+            startAt: { opacity: 0, scale: 0.5 },
+            ease: "elastic.out(1, 0.5)"
+        });
+
         // Features Animation
         gsap.utils.toArray(".feature-card").forEach((card, i) => {
             gsap.to(card, {
@@ -172,8 +219,16 @@
                 delay: i * 0.2,
                 ease: "back.out(1.7)"
             });
+
+            // Hover effect for recorder "Focus"
+            card.addEventListener('mouseenter', () => {
+                gsap.to(card, { scale: 1.05, borderColor: '#00ff88', duration: 0.3 });
+            });
+            card.addEventListener('mouseleave', () => {
+                gsap.to(card, { scale: 1, borderColor: 'rgba(255,255,255,0.1)', duration: 0.3 });
+            });
         });
-        
+
         gsap.to(".feature-title", {
             scrollTrigger: {
                 trigger: "#features",
@@ -183,7 +238,7 @@
             y: 0,
             duration: 1
         });
-        
+
         // CTA Animation
         gsap.to(".cta-title", {
             scrollTrigger: {
@@ -194,7 +249,7 @@
             y: 0,
             duration: 1
         });
-        
+
         gsap.to(".cta-text", {
             scrollTrigger: {
                 trigger: "#cta",
@@ -205,7 +260,7 @@
             duration: 1,
             delay: 0.2
         });
-        
+
         gsap.to(".cta-btn", {
             scrollTrigger: {
                 trigger: "#cta",
@@ -217,7 +272,7 @@
             delay: 0.5,
             ease: "elastic.out(1, 0.3)"
         });
-        
+
         // Floating Orbs
         gsap.to(".floating-orb", {
             y: 50,
@@ -228,4 +283,5 @@
         });
     </script>
 </body>
+
 </html>
