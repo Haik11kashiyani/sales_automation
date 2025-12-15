@@ -57,7 +57,9 @@ async def record_url(file_path: str, duration: float, output_path: str):
         )
         
         # Mobile Emulation setup
-        # 360x640 @ 3x = 1080x1920 physical pixels.
+        # iPhone 14 Pro Max-ish aspect ratio but scaled to 1080w
+        # Logic: 430px width * 2.5 scale = ~1075px (Close to 1080)
+        # Let's stick to the proven 360 * 3 = 1080.
         context = await browser.new_context(
             viewport={"width": 360, "height": 640},
             device_scale_factor=3.0,
@@ -75,106 +77,101 @@ async def record_url(file_path: str, duration: float, output_path: str):
         except:
              await page.goto(url)
 
-        # Force GSAP refresh and ensure body covers viewport
-        await page.evaluate("""
-            if(window.ScrollTrigger) window.ScrollTrigger.refresh();
-            document.body.style.minHeight = '100vh';
-            document.body.style.width = '100%';
+        # --- FIX RENDERING ISSUES ---
+        # Inject CSS to force the body to fill the viewport and remove margins
+        # This fixes the "small box in gray void" issue seen in user screenshot
+        await page.add_style_tag(content="""
+            html, body {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                overflow-x: hidden;
+            }
+            /* Hide scrollbars visually but keep functionality */
+            ::-webkit-scrollbar {
+                display: none;
+            }
         """)
+
+        # Force GSAP refresh
+        await page.evaluate("if(window.ScrollTrigger) window.ScrollTrigger.refresh()")
         await page.wait_for_timeout(1000)
         
-        # --- HUMAN SCROLL LOGIC ---
-        # Instead of linear constant speed, we use a curve.
-        # Start slow (reading), speed up (scanning), slow down (ending).
+        # --- SMART HUMAN SURFING LOGIC ---
+        # 1. Analyze Page: Find "Points of Interest" (POIs)
+        # 2. Logic:
+        #    - If current viewport has POIs -> Scroll Slow, Hover, Interact.
+        #    - If empty -> Scroll Fast (Skim).
+        
+        # Get all POIs positions
+        pois = await page.evaluate("""() => {
+            const targets = Array.from(document.querySelectorAll('button, a, input, canvas, .card, .interactive, h1, h2, video'));
+            return targets.map(t => {
+                const r = t.getBoundingClientRect();
+                return {
+                    y: r.top + window.scrollY, # Absolute Y position
+                    height: r.height,
+                    type: t.tagName,
+                    centerX: r.left + r.width/2,
+                    centerY: r.top + r.height/2
+                };
+            }).sort((a, b) => a.y - b.y);
+        }""")
         
         total_height = await page.evaluate("document.body.scrollHeight")
         viewport_height = 640
-        scroll_dist = total_height - viewport_height
+        current_scroll = 0
         
-        if scroll_dist > 0:
-            import math
-            import random
+        start_time = time.time()
+        
+        while current_scroll < (total_height - viewport_height):
+            # Check elapsed time to ensure we respect roughly the duration (optional, but good for shorts)
+            # If we are "skimming" too fast, we might end early. If interacting too much, we might cut off.
+            # For now, priority is 'Human Feel' over exact second count.
             
-            # FPS for scroll updates
-            fps = 60 
-            total_frames = int(duration * fps)
+            # Identify POIs in the NEXT viewport slice (what we are scrolling into)
+            # Look ahead ~300px
+            look_ahead = current_scroll + 300
             
-            current_y = 0
+            visible_pois = [p for p in pois if p['y'] > current_scroll and p['y'] < (current_scroll + viewport_height)]
             
-            # Interaction Config
-            interaction_interval = fps * 2 # Every 2 seconds approx
-            frames_since_interaction = 0
+            if len(visible_pois) > 0:
+                # INTERESTING ZONE: Scroll Slow + Interact
+                step = random.randint(20, 50) # Slow scroll
+                
+                # Chance to interact with a POI
+                if random.random() < 0.6: # 60% chance to interact if POI exists
+                    target = random.choice(visible_pois)
+                    # Mouse Move to it (relative to viewport)
+                    mouse_y = target['centerY'] - current_scroll
+                    # Ensure it's on screen
+                    if 0 < mouse_y < 640:
+                         await page.mouse.move(target['centerX'], mouse_y, steps=15)
+                         
+                         if target['type'] == 'CANVAS':
+                             # 3D WIGGLE
+                             for i in range(5):
+                                 await page.mouse.move(target['centerX'] + random.randint(-20, 20), mouse_y + random.randint(-20, 20), steps=5)
+                         else:
+                             # HOVER/FOCUS
+                             await page.wait_for_timeout(random.randint(300, 800)) # Look at it
+            else:
+                # BORING ZONE: Scroll Fast (Skim)
+                step = random.randint(100, 200) # Fast scroll
             
-            for frame in range(total_frames):
-                # Progress (0.0 to 1.0)
-                t = frame / total_frames
+            # Perform the scroll
+            await page.mouse.wheel(0, step)
+            current_scroll += step
+            
+            # Random micropause (human thinking/reading)
+            if random.random() < 0.1:
+                await page.wait_for_timeout(random.randint(200, 500))
                 
-                # Easing function: EaseInOutCubic
-                if t < 0.5:
-                    ease = 4 * t * t * t
-                else:
-                    ease = 1 - pow(-2 * t + 2, 3) / 2
-                
-                target_y = scroll_dist * ease
-                
-                # Calculate delta for this frame
-                delta = target_y - current_y
-                
-                # Add tiny random jitter to look human (imperfection)
-                jitter = random.uniform(-0.5, 0.5)
-                
-                if delta > 0:
-                    await page.mouse.wheel(0, delta + jitter)
-                    current_y += delta
-                
-                # --- INTERACTION LOGIC ---
-                # Every few seconds, move the mouse to "look" at something
-                frames_since_interaction += 1
-                if frames_since_interaction > interaction_interval:
-                    # Reset timer with some randomness
-                    frames_since_interaction = -random.randint(0, fps) 
-                    
-                    # 1. Find visible interactive elements in viewport
-                    # We inject JS to find elements relative to current scroll
-                    # Targets: buttons, links, inputs, canvases (3D), cards
-                    element_pos = await page.evaluate("""() => {
-                        const targets = Array.from(document.querySelectorAll('button, a, input, canvas, .card, .interactive'));
-                        const visible = targets.filter(t => {
-                            const rect = t.getBoundingClientRect();
-                            return rect.top >= 0 && rect.bottom <= window.innerHeight && rect.width > 0 && rect.height > 0;
-                        });
-                        
-                        if (visible.length > 0) {
-                            // Pick random one
-                            const update = visible[Math.floor(Math.random() * visible.length)];
-                            const rect = update.getBoundingClientRect();
-                            return {x: rect.x + rect.width/2, y: rect.y + rect.height/2, type: update.tagName};
-                        }
-                        return null;
-                    }""")
-                    
-                    if element_pos:
-                        # Smoothly move mouse to target
-                        # steps=20 makes it take ~0.3s (at 60fps) -> looks like human eye tracking
-                        await page.mouse.move(element_pos['x'], element_pos['y'], steps=25)
-                        
-                        # Interaction: Hover (Pause scroll slightly?)
-                        # If it's a Canvas (3D), do a wiggle
-                        if element_pos['type'] == 'CANVAS':
-                            # Wiggle mouse in circle for 3D effect
-                            cx, cy = element_pos['x'], element_pos['y']
-                            for w in range(10):
-                                wx = cx + math.sin(w) * 50
-                                wy = cy + math.cos(w) * 50
-                                await page.mouse.move(wx, wy, steps=2)
-                        
-                        # Just hover for a bit
-                        await page.wait_for_timeout(500 + random.randint(0, 500))
-                
-                await page.wait_for_timeout(1000/fps)
-                
-        else:
-             await page.wait_for_timeout(duration * 1000)
+            await page.wait_for_timeout(random.randint(16, 32)) # ~30-60fps variance
+            
+            # Ensure we don't loop forever
+            if time.time() - start_time > (duration + 10): # Timeout hardstop
+                break
              
         await context.close()
         await browser.close()
