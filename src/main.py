@@ -7,6 +7,7 @@ from editor import assemble_video
 import argparse
 
 from recorder import record_url, run_server_in_thread
+from creative import generate_viral_hooks
 import time
 
 # Paths
@@ -81,9 +82,7 @@ def main():
         print(f"No script.json found for {folder}, skipping.")
         return
 
-from creative import generate_viral_hooks
-
-    # ... (existing code) ...
+        return
 
     # Extract Metadata
     # 1. Start with Script Defaults (base source of truth)
