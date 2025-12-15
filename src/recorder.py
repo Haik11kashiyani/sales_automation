@@ -1,34 +1,66 @@
 import asyncio
 from playwright.async_api import async_playwright
 import os
+import threading
+import http.server
+import socketserver
+import time
 
-async def record_url(url: str, duration: float, output_path: str):
+# --- Helper to start a local server for the content ---
+PORT = 8000
+SERVER_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../")) 
+# We serve from project root so we can access content_pool/business_01
+
+class QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+def start_server():
+    os.chdir(SERVER_ROOT)
+    with socketserver.TCPServer(("", PORT), QuietHandler) as httpd:
+        print(f"Serving at port {PORT}")
+        httpd.serve_forever()
+
+def run_server_in_thread():
+    t = threading.Thread(target=start_server)
+    t.daemon = True
+    t.start()
+    return t
+
+# --- Recorder Logic ---
+
+async def record_url(file_path: str, duration: float, output_path: str):
     """
-    Records a webpage interaction:
-    1. Launches browser (1080x1920)
-    2. Navigates to URL
-    3. Waits for load
-    4. Scrolls smoothly for 'duration' seconds
-    5. Saves video
+    Records a webpage interaction via localhost:
+    1. Launches browser (Mobile Emulation)
+    2. Navigates to localhost URL
+    3. Scrolls smoothly via MOUSE WHEEL for 'duration' seconds
+    4. Saves video
     """
-    print(f"Starting recording for {url} with duration {duration}s")
+    # 1. Start Server if not already likely running (simplistic check)
+    # Ideally main.py manages this, but for simplicity let's assume this script might be standalone.
+    # We will just rely on relative paths conversion to localhost URL.
+    # Logic: file_path is like ".../content_pool/business_01/index.html"
+    # We want "http://localhost:8000/content_pool/business_01/index.html"
     
+    # Calculate relative path from SERVER_ROOT
+    rel_path = os.path.relpath(file_path, SERVER_ROOT)
+    url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
+    
+    print(f"Recording URL: {url} | Duration: {duration}s")
+
     async with async_playwright() as p:
-        # Launch browser
         browser = await p.chromium.launch(
-            headless=False,
-            args=['--enable-features=OverlayScrollbar'] # Optional: hide scrollbars overlay style
+            headless=False, # XVFB handles this in CI
+            args=['--enable-features=OverlayScrollbar', '--no-sandbox']
         )
         
-        # Create context with MOBILE Emulation
-        # We want 1080x1920 output.
-        # CSS Viewport: 360x640 (Standard Mobile)
-        # Scale Factor: 3.0
-        # Result: 360*3 = 1080, 640*3 = 1920.
+        # Mobile Emulation setup
         context = await browser.new_context(
             viewport={"width": 360, "height": 640},
             device_scale_factor=3.0,
             is_mobile=True,
+            has_touch=True,
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             record_video_dir=os.path.dirname(output_path),
             record_video_size={"width": 1080, "height": 1920}
@@ -36,42 +68,40 @@ async def record_url(url: str, duration: float, output_path: str):
         
         page = await context.new_page()
         
-        # Open the local file or URL
-        # If it's a file path, convert to file:// URI
-        if os.path.exists(url):
-            url = f"file://{os.path.abspath(url)}"
-            
-        await page.goto(url)
-        
-        # Wait for initial load animations
+        try:
+            await page.goto(url, wait_until="networkidle")
+        except:
+             # Fallback if server failed or networkidle too strict
+             await page.goto(url)
+
+        # Force GSAP refresh
+        await page.evaluate("if(window.ScrollTrigger) window.ScrollTrigger.refresh()")
         await page.wait_for_timeout(1000)
         
-        # Smooth scroll logic
-        # We scroll from top to bottom over 'duration' seconds
-        # Calculate total height
-        total_height = await page.evaluate("() => document.body.scrollHeight")
-        viewport_height = 1920
+        # Scroll Logic: MOUSE WHEEL
+        # Total height approximation
+        total_height = await page.evaluate("document.body.scrollHeight")
+        viewport_height = 640 # logic viewport
+        
         scrollable_distance = total_height - viewport_height
         
         if scrollable_distance > 0:
-            steps = int(duration * 60) # 60 fps assumed for smoothness steps
-            step_time = (duration * 1000) / steps
-            step_distance = scrollable_distance / steps
+            # We want to scroll 'scrollable_distance' over 'duration' seconds.
+            # We'll use small increments
+            fps = 30
+            total_frames = int(duration * fps)
+            pixels_per_frame = scrollable_distance / total_frames
             
-            for i in range(steps):
-                await page.evaluate(f"window.scrollBy(0, {step_distance})")
-                await page.wait_for_timeout(step_time)
+            for _ in range(total_frames):
+                # page.mouse.wheel(delta_x, delta_y)
+                await page.mouse.wheel(0, pixels_per_frame)
+                await page.wait_for_timeout(1000/fps)
         else:
-             # Just wait if no scroll
-            await page.wait_for_timeout(duration * 1000)
-            
+             await page.wait_for_timeout(duration * 1000)
+             
         await context.close()
         await browser.close()
         
-        # Playwright saves video with random name, we need to rename it
-        # The video file is likely the only .webm/.mp4 in the dir if we clean up, 
-        # but context.record_video_dir was set.
-        # Actually, page.video.path() gives the path.
         saved_video_path = await page.video.path()
         if saved_video_path:
              if os.path.exists(output_path):
@@ -81,5 +111,9 @@ async def record_url(url: str, duration: float, output_path: str):
 
 if __name__ == "__main__":
     # Test execution
+    # Start server for testing
+    run_server_in_thread()
+    time.sleep(1) # wait for server
+    
     test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
     asyncio.run(record_url(test_html, 30, "test_output.mp4"))
