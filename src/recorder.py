@@ -33,41 +33,24 @@ def run_server_in_thread():
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     """
-    Records a webpage interaction via localhost:
-    1. Launches browser (Mobile Emulation)
-    2. Navigates to localhost URL
-    3. Scrolls smoothly via MOUSE WHEEL for 'duration' seconds
-    4. Saves video
+    Records a webpage interaction via localhost using an IFRAME isolation strategy.
+    The Host Page is 1080x1920 (Presentation).
+    The Content is an Iframe (375x100%) scaled up.
     """
-    # 1. Start Server if not already likely running (simplistic check)
-    # Ideally main.py manages this, but for simplicity let's assume this script might be standalone.
-    # We will just rely on relative paths conversion to localhost URL.
-    # Logic: file_path is like ".../content_pool/business_01/index.html"
-    # We want "http://localhost:8000/content_pool/business_01/index.html"
-    
-    # Calculate relative path from SERVER_ROOT
     rel_path = os.path.relpath(file_path, SERVER_ROOT)
-    url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
+    target_url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
     
-    print(f"Recording URL: {url} | Duration: {duration}s")
+    print(f"Recording URL: {target_url} | Duration: {duration}s")
 
     async with async_playwright() as p:
-        # Use new headless mode for better rendering compliance
         browser = await p.chromium.launch(
             headless=True,
             args=['--enable-features=OverlayScrollbar', '--no-sandbox', '--disable-setuid-sandbox']
         )
         
-        # Mobile Emulation setup
-        # STRATEGY CHANGE: "CSS Transform Mock"
-        # 1. We keep native 1080x1920 canvas.
-        # 2. We set body width to 360px (Mobile Standard).
-        # 3. We scale the body by 3x.
-        # Result: Perfect 360px layout (responsive) projected onto 1080px canvas.
         context = await browser.new_context(
             viewport={"width": 1080, "height": 1920},
             device_scale_factor=1.0,
-            is_mobile=False,
             has_touch=True,
             record_video_dir=os.path.dirname(output_path),
             record_video_size={"width": 1080, "height": 1920}
@@ -75,414 +58,321 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         
         page = await context.new_page()
         
-        try:
-            await page.goto(url, wait_until="networkidle")
-        except:
-             await page.goto(url)
+        # --- IFRAME HOST PAGE GENERATION ---
+        # We construct the Presentation UI *around* the iframe.
+        # The iframe 'src' is the actual site.
+        
+        # Constants for Scaling
+        MOBILE_W = 390
+        MOBILE_H = 844 # iPhone 12/13/14
+        SCALE_FACTOR = 2.3 # Fits 390 * 2.3 = ~897px width
+        
+        # Header/Footer Text Defaults
+        header_txt = overlay_header if overlay_header else "WEB DESIGN AWARDS"
+        title_txt = overlay_text if overlay_text else "FUTURE OF WEB"
+        cta_txt = cta_text if cta_text else "VISIT WEBSITE"
+        sub_txt = cta_subtext if cta_subtext else "LINK IN BIO"
 
-        # --- FIX RENDERING & INJECT CURSOR ---
-        # --- PRESENTATION MODE: MOCKUP WRAPPER ---
-        # Instead of scaling the body, we Wrap the existing content in a Phone Mockup.
-        
-        # 1. Inject Styles for the Wrapper
-        # --- PRESENTATION MODE: OVERLAY STRATEGY (Non-Destructive) ---
-        # 1. We keep the Body as the "Page". We Scale it to look like mobile.
-        # 2. We inject a FIXED Overlay on top that contains the "Phone Frame", Header, and Footer.
-        # 3. We use pointer-events: none on the overlay so clicks pass through to the body.
-        
-        await page.add_style_tag(content="""
-            /* 1. Force Mobile Layout on the content */
-            html {
-                width: 100%;
-                overflow-x: hidden;
-                background: #000; /* Outer background */
-            }
-            
-            body {
-                width: 390px; /* Standard Modern Mobile Width */
-                min-height: 100vh;
-                margin: 0 auto; /* Center mechanically */
-                background: #0a0a0a; /* Site background */
+        host_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{
+                    margin: 0; padding: 0;
+                    width: 1080px; height: 1920px;
+                    background: radial-gradient(circle at center, #1b1b1b, #000);
+                    color: white;
+                    font-family: 'Arial', sans-serif;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }}
                 
-                /* THE TRANSFORM: Scale it up to fill the 1080px width */
-                /* 1080 / 390 = 2.76 */
-                /* Let's aim for a Frame width of ~750px (Visual). */
-                /* 750 / 390 = ~1.92. Let's use 2.0 */
+                #header-group {{
+                    margin-top: 60px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    z-index: 10;
+                }}
                 
-                transform: scale(2.2); 
-                transform-origin: top center;
+                #p-header {{
+                    font-size: 40px; font-weight: bold; letter-spacing: 3px;
+                    color: #666; text-transform: uppercase;
+                }}
                 
-                /* Push it down to start inside the frame 'window' */
-                /* Frame starts at roughly 300px from top? */
-                /* Since we scale from top, the top edge stays at 0. */
-                /* We need to move the body down. */
-                position: relative;
-                top: 280px; /* Adjust based on frame header height */
+                #p-title {{
+                    font-size: 70px; font-weight: 900;
+                    background: linear-gradient(90deg, #fff, #aaa);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    margin-top: 10px;
+                }}
                 
-                overflow-y: visible;
-                overflow-x: hidden;
-            }
-            
-            /* Hide scrollbars */
-            ::-webkit-scrollbar { display: none; }
-            
-            /* 2. The Overlay HUD (Heads Up Display) */
-            #presentation-overlay {
-                position: fixed;
-                top: 0; 
-                left: 0;
-                width: 1080px;
-                height: 1920px;
-                z-index: 99990; /* High Z-index */
-                pointer-events: none; /* CLICK THROUGH to body! */
+                /* The Phone Wrapper */
+                #phone-wrapper {{
+                    margin-top: 60px;
+                    position: relative;
+                    width: {MOBILE_W * SCALE_FACTOR}px;
+                    height: 1250px;
+                    /* Visual Border */
+                    border: 25px solid #222;
+                    border-radius: 50px;
+                    box-shadow: 0 0 100px rgba(0, 255, 136, 0.1);
+                    overflow: hidden;
+                    background: #000;
+                    flex-shrink: 0;
+                }}
                 
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                
-                /* Background: We need the center to be transparent (to see body) */
-                /* But the sides/top/bottom to be Black/Gradient. */
-                /* Using a giant radial gradient or border hack? */
-                /* Let's use a "Masking" approach with borders. */
-                /* Or just simpler: Use CSS Grid or Flex to place blockers. */
-            }
-            
-            /* The "Frame" that visually surrounds the content */
-            .frame-border {
-                position: absolute;
-                top: 250px; /* Start of phone screen */
-                width: 860px; /* 390 * 2.2 = 858px */
-                height: 1300px;
-                
-                border: 25px solid #222;
-                border-radius: 50px;
-                box-shadow: 
-                    0 0 0 1000px #000, /* The giant blocker for everything else */
-                    inset 0 0 40px rgba(0,0,0,0.5), /* Inner shadow */
-                    0 0 80px rgba(0, 255, 136, 0.15); /* Outer Glow */
+                /* The Iframe Itself */
+                #content-iframe {{
+                    width: {MOBILE_W}px;
+                    height: 100%; /* Will fill the scaled height? No, must trigger scroll. */
+                    height: {int(1250 / SCALE_FACTOR)}px; /* Logical height to fill frame? No, let's just make it 100% and scroll internal? */
+                    /* Better: Make iframe full height of the logic, transform it. */
                     
-                z-index: 1; /* Behind text, in front of nothing? */
-                pointer-events: none;
-            }
-            
-            /* Text Layers (On top of the black blocker) */
-            .overlay-content {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                z-index: 2;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: space-between;
-                padding: 60px 0;
-            }
-            
-            #presentation-header {
-                font-size: 40px;
-                font-weight: bold;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-                color: #666;
-                margin-top: 20px;
-            }
-            
-            #presentation-title {
-                 font-size: 65px;
-                 font-weight: 800;
-                 text-align: center;
-                 background: linear-gradient(90deg, #fff, #999);
-                 -webkit-background-clip: text;
-                 -webkit-text-fill-color: transparent;
-                 margin-top: 10px;
-            }
-            
-            #presentation-footer {
-                margin-bottom: 80px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 15px;
-            }
-              
-            .cta-button {
-                background: linear-gradient(135deg, #0cebeb, #20e3b2, #29ffc6);
-                color: #000;
-                padding: 20px 70px;
-                border-radius: 60px;
-                font-weight: 900;
-                font-size: 38px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                box-shadow: 0 0 40px rgba(32, 227, 178, 0.5);
-                animation: pulse-glow 2.5s infinite ease-in-out;
-            }
-            
-            .cta-subtext {
-                font-size: 22px;
-                color: #888;
-                font-weight: bold;
-                letter-spacing: 3px;
-                text-transform: uppercase;
-                animation: fade-in-up 1s ease-out;
-            }
-            
-            @keyframes pulse-glow {
-                0% { transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }
-                50% { transform: scale(1.03); box-shadow: 0 0 70px rgba(32, 227, 178, 0.7); }
-                100% { transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }
-            }
-            
-            /* Cursor - Needs to match the SCALE */
-            /* Since body is scaled 2.2x, if we put cursor in body, it scales too. */
-            /* 20px cursor * 2.2 = 44px visual. Good. */
-            #ai-cursor {
-                position: absolute;
-                top: 0; left: 0;
-                width: 20px;
-                height: 20px;
-                background: rgba(0, 255, 136, 0.9);
-                border: 2px solid white;
-                border-radius: 50%;
-                pointer-events: none;
-                z-index: 999999;
-                transition: transform 0.1s;
-                box-shadow: 0 0 10px rgba(0,255,136,0.6);
-            }
-        """)
-
-        js_injection = f"""
-            // Create the Overlay HUD
-            const overlay = document.createElement('div');
-            overlay.id = 'presentation-overlay';
-            
-            // Frame Border (The Blocker)
-            const frame = document.createElement('div');
-            frame.className = 'frame-border';
-            
-            // Content Container
-            const content = document.createElement('div');
-            content.className = 'overlay-content';
-            
-            // Header Group
-            const headerGroup = document.createElement('div');
-            headerGroup.style.display = 'flex';
-            headerGroup.style.flexDirection = 'column';
-            headerGroup.style.alignItems = 'center';
-            
-            const header = document.createElement('div');
-            header.id = 'presentation-header';
-            header.innerText = "{overlay_header if overlay_header else 'WEB DESIGN AWARDS'}";
-            
-            const title = document.createElement('div');
-            title.id = 'presentation-title';
-            title.innerText = "{overlay_text if overlay_text else 'THE FUTURE IS HERE'}";
-            
-            headerGroup.appendChild(header);
-            headerGroup.appendChild(title);
-            
-            // Footer Group
-            const footer = document.createElement('div');
-            footer.id = 'presentation-footer';
-            
-            const ctaBtn = document.createElement('div');
-            ctaBtn.className = 'cta-button';
-            ctaBtn.innerText = "{cta_text if cta_text else 'VISIT WEBSITE'}";
-            
-            const ctaSub = document.createElement('div');
-            ctaSub.className = 'cta-subtext';
-            ctaSub.innerText = "{cta_subtext if cta_subtext else 'LINK IN BIO'}";
-            
-            footer.appendChild(ctaBtn);
-            footer.appendChild(ctaSub);
-            
-            // Assemble content
-            content.appendChild(headerGroup);
-            // Spacer to push footer to bottom is handled by justify-content: space-between
-            content.appendChild(footer);
-            
-            overlay.appendChild(frame);
-            overlay.appendChild(content);
-            
-            document.body.appendChild(overlay);
-            
-            // AI Cursor (Inside Body, so it scales with content)
-            const c = document.createElement('div');
-            c.id = 'ai-cursor';
-            document.body.appendChild(c);
-            
-            // Sync Logic
-            // Playwright gives us Viewport coordinates (0-1080).
-            // Our body is Scaled (2.2) and Offset (Top 280).
-            // We need to inverse map the coordinates.
-            
-            // VisualX = (LogicalX * Scale) + MarginX
-            // LogicalX = (VisualX - MarginX) / Scale
-            
-            // MarginX is auto (centered).
-            // Body Width = 390. Scaled = 858. 
-            // Viewport = 1080.
-            // MarginX = (1080 - 858) / 2 = 111px.
-            
-            const SCALE = 2.2;
-            const MARGIN_X = (1080 - (390 * SCALE)) / 2;
-            const MARGIN_Y = 280; // Top offset
-            
-            document.addEventListener('mousemove', e => {{
-                // e.clientX is Viewport (Visual).
-                // We want to set 'left'/ 'top' on the cursor which is in the SCALED body context.
+                    /* Actually, we want the iframe to be the 'window' */
+                    width: {MOBILE_W}px;
+                    height: 100%; 
+                    border: none;
+                    background: #fff;
+                    
+                    transform: scale({SCALE_FACTOR});
+                    transform-origin: top left;
+                    
+                    /* Force Width to be exact logic pixels */
+                    /* Wait, if we scale the iframe element, its content scales. */
+                    /* But the container is large. */
+                }}
                 
-                const logicalX = (e.clientX - MARGIN_X) / SCALE;
-                const logicalY = (e.clientY - MARGIN_Y) / SCALE;
+                /* Better Approach: 
+                   Wrapper is 900px wide.
+                   Iframe is 390px wide.
+                   Transform Scale(2.3) makes Iframe 897px wide.
+                   We place Iframe inside Wrapper.
+                */
                 
-                c.style.left = logicalX + 'px';
-                c.style.top = logicalY + 'px';
-            }});
+                #footer-group {{
+                    margin-top: auto;
+                    margin-bottom: 80px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 20px;
+                    z-index: 10;
+                }}
+                
+                 .cta-button {{
+                    background: linear-gradient(135deg, #0cebeb, #20e3b2, #29ffc6);
+                    color: #000;
+                    padding: 20px 70px;
+                    border-radius: 60px;
+                    font-weight: 900;
+                    font-size: 40px;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    box-shadow: 0 0 40px rgba(32, 227, 178, 0.5);
+                    animation: pulse-glow 2.5s infinite ease-in-out;
+                }}
+                
+                .cta-subtext {{
+                    font-size: 24px; color: #888; font-weight: bold;
+                    letter-spacing: 3px; text-transform: uppercase;
+                }}
+                
+                @keyframes pulse-glow {{
+                    0% {{ transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }}
+                    50% {{ transform: scale(1.03); box-shadow: 0 0 70px rgba(32, 227, 178, 0.7); }}
+                    100% {{ transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }}
+                }}
+                
+                #ai-cursor {{
+                    position: absolute; top: 0; left: 0;
+                    width: 40px; height: 40px;
+                    background: rgba(0, 255, 136, 0.9);
+                    border: 3px solid white; border-radius: 50%;
+                    pointer-events: none; z-index: 9999;
+                    box-shadow: 0 0 15px rgba(0,255,136,0.6);
+                    transition: transform 0.1s;
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="header-group">
+                <div id="p-header">{header_txt}</div>
+                <div id="p-title">{title_txt}</div>
+            </div>
             
-            document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
-            document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
+            <div id="phone-wrapper">
+                <iframe id="content-iframe" src="{target_url}" scrolling="yes"></iframe>
+            </div>
+            
+            <div id="footer-group">
+                <div class="cta-button">{cta_txt}</div>
+                <div class="cta-subtext">{sub_txt}</div>
+            </div>
+            
+            <div id="ai-cursor"></div>
+            
+            <script>
+                // Cursor Logic (Visual Only)
+                const c = document.getElementById('ai-cursor');
+                document.addEventListener('mousemove', e => {{
+                    c.style.left = e.clientX + 'px';
+                    c.style.top = e.clientY + 'px';
+                }});
+                document.addEventListener('mousedown', () => c.style.transform = 'scale(0.8)');
+                document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
+            </script>
+        </body>
+        </html>
         """
         
-        await page.evaluate(js_injection)
+        # Load the Host Page
+        await page.set_content(host_html)
         
-        await page.evaluate(js_injection)
+        # Helper: Wait for Iframe to Load
+        # In Playwright, we can get the frame by name or URL? 
+        # Since it's dynamically loaded, we wait for the element then get content frame.
+        iframe_element = await page.query_selector('#content-iframe')
+        content_frame = await iframe_element.content_frame()
         
-        # Helper function for text overlay logic.
-        pass
-
-        # Force GSAP refresh
-        await page.evaluate("if(window.ScrollTrigger) window.ScrollTrigger.refresh()")
-        await page.wait_for_timeout(1000)
-        
-        # --- LOGIC UPDATE: Overlay Mode ---
-        # We scroll the WINDOW (since body is the page).
-        # We filter targets based on if they are in the "Frame" area visually.
-        # But actually, with the `box-shadow` mask, we can just allow everything in viewport to be candidate.
-        
-        pois = await page.evaluate("""() => {
-            const targets = Array.from(document.querySelectorAll('button, a, input, canvas, .card, .interactive, h1, h2, video'));
-            return targets.map(t => {
-                const r = t.getBoundingClientRect();
-                return {
-                    y: r.top + window.scrollY,
-                    height: r.height,
-                    type: t.tagName,
-                    classList: Array.from(t.classList).join(' '),
-                    centerX: r.left + r.width/2,
-                    centerY: r.top + r.height/2
-                };
-            }).sort((a, b) => a.y - b.y);
-        }""")
-        
-        total_height = await page.evaluate("document.body.scrollHeight") 
-        viewport_height = 1920 
-        
-        current_scroll = 0
-        start_time = time.time()
-        
-        # Initial Mouse Move
-        await page.mouse.move(540, 960) 
-        
-        # --- NAVIGATION & INTERACTION LOGIC ---
-        
-        # 1. Identify "Hamburger" or Menu buttons explicitly for mobile
-        nav_targets = await page.evaluate("""() => {
-            const candidates = Array.from(document.querySelectorAll('nav button, [aria-label="menu"], .hamburger, .menu-toggle, #nav-toggle'));
-            return candidates.map(t => {
-                const r = t.getBoundingClientRect();
-                return {
-                    x: r.left + r.width/2,
-                    y: r.top + r.height/2,
-                    type: 'NAV'
-                };
-            });
-        }""")
-        
-        # Interaction Loop
-        while True:
-            current_scroll_y = await page.evaluate("window.scrollY")
+        if not content_frame:
+            # Wait a bit if not ready
+            await page.wait_for_timeout(2000)
+            content_frame = await iframe_element.content_frame()
             
-            # A. NAV INTERACTION (Happens occasionally if visible)
-            if len(nav_targets) > 0 and random.random() < 0.15: # 15% chance to toggle menu
-                 # Check if nav is visible (sticky or at top)
-                 # Simpler: just pick one and try if it looks valid
-                 nt = random.choice(nav_targets)
-                 # Verify it's in viewport (targets are static rects? No, nav moves if sticky.)
-                 # Let's re-eval nav position
-                 valid_nav = await page.evaluate("""(x, y) => {
-                     const el = document.elementFromPoint(x, y);
-                     return el && (el.tagName === 'BUTTON' || el.closest('button') || el.closest('nav'));
-                 }""", nt['x'], nt['y'])
-                 
-                 if valid_nav:
-                     await page.mouse.move(nt['x'], nt['y'], steps=20)
-                     await page.mouse.down()
-                     await page.wait_for_timeout(100)
-                     await page.mouse.up()
-                     await page.wait_for_timeout(1500) # Let menu animation play
-                     # Click again to close? Or scroll away.
-                     if random.random() > 0.5:
-                         await page.mouse.down()
-                         await page.wait_for_timeout(100)
-                         await page.mouse.up()
-                         await page.wait_for_timeout(500)
+        if not content_frame:
+            print("Error: Could not access content iframe.")
+            return
 
-            # B. STANDARD INTERACTION
-            # Improved to include Header, Footer, Nav, and structural elements
-            visible_targets = await page.evaluate("""() => {
-                const targets = Array.from(document.querySelectorAll('header, footer, nav, button, a, .card, .interactive, canvas, input, h1, h2, section'));
-                return targets.map(t => {
-                     const r = t.getBoundingClientRect();
-                     // Check if it's reasonably visible in the "Phone Frame" zone (Visual Y: 250-1550)
-                     if (r.top > 200 && r.bottom < 1600) { 
-                         return {
-                             x: r.left + r.width/2,
-                             y: r.top + r.height/2,
-                             type: t.tagName,
-                             cls: Array.from(t.classList).join(' ')
-                         };
-                     }
-                     return null;
-                }).filter(t => t !== null);
+        # Wait for site to load inside iframe
+        try:
+            await content_frame.wait_for_load_state("networkidle")
+        except:
+            await page.wait_for_timeout(2000)
+            
+        print("Iframe Loaded. Starting Interaction Loop.")
+        
+        # --- COORDINATE TRANSLATION SYSTEM ---
+        # We need to map [Frame X, Y] -> [Viewport X, Y] to move the mouse.
+        #
+        # Math:
+        # Wrapper is centered horizontally?
+        # Host: 1080w. Wrapper: (390 * 2.3) = 897w.
+        # Wrapper Left = (1080 - 897) / 2 = 91.5px.
+        # Wrapper Top = Computed by Flex (Margin 60 + Header ~100) = ~160px.
+        #
+        # BUT relying on static math is risky. Let's ask the page!
+        
+        async def get_wrapper_offset():
+            return await page.evaluate("""() => {
+                const rect = document.getElementById('phone-wrapper').getBoundingClientRect();
+                return { x: rect.left, y: rect.top };
             }""")
             
-            should_interact = False
-            if len(visible_targets) > 0 and random.random() < 0.75: # High interaction rate
-                 should_interact = True
+        wrapper_offset = await get_wrapper_offset()
+        # Scale Factor is known: 2.3
+        
+        def frame_to_viewport(fx, fy):
+            # The iframe content is scaled by SCALE_FACTOR.
+            # So 1px in Frame = 2.3px in Viewport.
+            vx = wrapper_offset['x'] + (fx * SCALE_FACTOR)
+            vy = wrapper_offset['y'] + (fy * SCALE_FACTOR)
+            return vx, vy
 
-            if should_interact:
-                target = random.choice(visible_targets)
-                # Move Mouse
-                await page.mouse.move(target['x'], target['y'], steps=random.randint(10, 25))
+        # --- INTERACTION LOOP (Targeting the FRAME) ---
+        
+        # 1. Hide Scrollbars inside Iframe (Inject CSS into Frame)
+        await content_frame.add_style_tag(content="""
+            ::-webkit-scrollbar { display: none; }
+            body { -ms-overflow-style: none; scrollbar-width: none; }
+        """)
+
+        start_time = time.time()
+        
+        # Move mouse to center initially
+        cx, cy = frame_to_viewport(MOBILE_W / 2, MOBILE_H / 2)
+        await page.mouse.move(cx, cy)
+        
+        while True:
+            # 1. Find Candidates inside FRAME
+            # We look for interactive elements
+            # Note: We query the FRAME, not the PAGE.
+            
+            candidates = await content_frame.evaluate("""() => {
+                const els = Array.from(document.querySelectorAll('button, a, input, header, footer, nav, section, h1, h2, .card, .interactive'));
+                return els.map(e => {
+                    const r = e.getBoundingClientRect();
+                    return {
+                        x: r.left + r.width/2,
+                        y: r.top + r.height/2,
+                        role: e.tagName,
+                        cls: Array.from(e.classList).join(' ')
+                    };
+                });
+            }""")
+            
+            # Filter candidates that are currently visible in the Iframe's Viewport
+            # The iframe window height is ~1250 / 2.3 = ~543px (Layout Height)
+            # Actually, "height: 100%" on iframe in HTML means it takes the height of the parent (1250).
+            # But scaled... CSS Transforms on Iframes are tricky.
+            # If parent is 1250px high, and iframe is scaled 2.3x...
+            # The logical height of the iframe document should be 1250 / 2.3 = 543px.
+            # So elements with Y > 543 are "below the fold".
+            
+            # Use `content_frame.evaluate('window.innerHeight')` to be sure.
+            frame_viewport_h = await content_frame.evaluate("window.innerHeight")
+            
+            visible_candidates = [c for c in candidates if 0 <= c['y'] <= frame_viewport_h]
+            
+            should_interact = False
+            target = None
+            if visible_candidates and random.random() < 0.7:
+                target = random.choice(visible_candidates)
+                should_interact = True
                 
-                # Action based on type
-                if target['type'] == 'CANVAS':
-                    # Drag for WebGL
+            if should_interact and target:
+                # Convert to Viewport
+                vx, vy = frame_to_viewport(target['x'], target['y'])
+                
+                # Move
+                await page.mouse.move(vx, vy, steps=random.randint(15, 30))
+                
+                # Interaction
+                if target['role'] in ['BUTTON', 'A', 'INPUT'] or 'btn' in target['cls']:
                     await page.mouse.down()
-                    await page.mouse.move(target['x'] + random.randint(-100, 100), target['y'] + random.randint(-50, 50), steps=15)
-                    await page.mouse.up()
-                elif target['type'] in ['BUTTON', 'A', 'INPUT'] or 'btn' in target['cls']:
-                    # Click
-                    await page.mouse.down()
-                    await page.wait_for_timeout(random.randint(50, 150))
+                    await page.wait_for_timeout(random.randint(50, 100))
                     await page.mouse.up()
                 else:
-                    # Header/Footer/Text -> Hover & Read
-                    await page.wait_for_timeout(random.randint(300, 600)) 
+                    await page.wait_for_timeout(random.randint(200, 500))
             
-            # C. SCROLL STEP
-            # Ensure we eventually reach the footer if it exists
-            step = random.randint(60, 220) 
-            await page.mouse.wheel(0, step)
-            await page.wait_for_timeout(random.randint(40, 90))
+            # SCROLLING
+            # We need to scroll the IFRAME window.
+            # page.mouse.wheel might not work if focus isn't right or if iframe swallows it.
+            # Better: `content_frame.evaluate("window.scrollBy(...)")`?
+            # Or assume if we hover over iframe, wheel works.
             
-            # End Condition: Time
-            if time.time() - start_time > duration + 8:
-                 break
-                 
+            # Let's use JS Scroll as it's more reliable for internal frames.
+            scroll_amount = random.randint(100, 300)
+            await content_frame.evaluate(f"window.scrollBy(0, {scroll_amount})")
+            
+            # Also visual "smooth" scroll simulation? 
+            # JS scroll is instant. We might want smooth behavior.
+            # await content_frame.evaluate(f"window.scrollBy({{top: {scroll_amount}, behavior: 'smooth'}})")
+            # Wait for scroll to visually happen
+            await page.wait_for_timeout(random.randint(500, 1000))
+            
+            # Time check
+            if time.time() - start_time > duration + 5:
+                break
+                
         await context.close()
         await browser.close()
         
+        # Save Video logic (similar to before, assuming Context recorded it)
         saved_video_path = await page.video.path()
         if saved_video_path:
              if os.path.exists(output_path):
