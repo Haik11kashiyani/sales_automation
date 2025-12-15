@@ -169,16 +169,16 @@ async def record_url(file_path: str, duration: float, output_path: str):
             return targets.map(t => {
                 const r = t.getBoundingClientRect();
                 return {
-                    y: r.top + window.scrollY, # This might be tricky with transform?
-                    # Window scroll Y is usually in viewport pixels? No, logical.
-                    # Actually, let's just use absolute page offset.
+                    y: r.top + window.scrollY,
+                    // Window scroll Y is usually in viewport pixels? No, logical.
+                    // Actually, let's just use absolute page offset.
                     
-                    # Safer: getBoundingClientRect().top + window.scrollY
-                    # If body is scaled, valid scroll height is HUGE or SMALL?
-                    # If 360px wide body is scaled 3x... total scroll height is logical (360 based) or visual?
-                    # Usually CSS transform doesn't affect scrollWidth/Height report of documentElement?
-                    # Let's assume standard behavior:
-                    # We will rely on r.top (Viewport relative) + scrollY (current scroll).
+                    // Safer: getBoundingClientRect().top + window.scrollY
+                    // If body is scaled, valid scroll height is HUGE or SMALL?
+                    // If 360px wide body is scaled 3x... total scroll height is logical (360 based) or visual?
+                    // Usually CSS transform doesn't affect scrollWidth/Height report of documentElement?
+                    // Let's assume standard behavior:
+                    // We will rely on r.top (Viewport relative) + scrollY (current scroll).
                     
                     y: r.top + window.scrollY,
                     height: r.height,
@@ -227,7 +227,7 @@ async def record_url(file_path: str, duration: float, output_path: str):
                 const targets = Array.from(document.querySelectorAll('button, a, .card, .interactive, canvas'));
                 return targets.map(t => {
                      const r = t.getBoundingClientRect();
-                     if (r.top > 100 && r.bottom < 1800) { # Visible in 1080x1920 frame
+                     if (r.top > 100 && r.bottom < 1800) { // Visible in 1080x1920 frame
                          return {
                              x: r.left + r.width/2,
                              y: r.top + r.height/2,
