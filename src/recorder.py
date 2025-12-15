@@ -109,7 +109,7 @@ async def record_url(file_path: str, duration: float, output_path: str):
             return targets.map(t => {
                 const r = t.getBoundingClientRect();
                 return {
-                    y: r.top + window.scrollY, # Absolute Y position
+                    y: r.top + window.scrollY, // Absolute Y position
                     height: r.height,
                     type: t.tagName,
                     centerX: r.left + r.width/2,
