@@ -31,7 +31,7 @@ def run_server_in_thread():
 
 # --- Recorder Logic ---
 
-async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = ""):
+async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     """
     Records a webpage interaction via localhost:
     1. Launches browser (Mobile Emulation)
@@ -158,15 +158,61 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             /* Hide scrollbars in mockup */
             #mockup-content::-webkit-scrollbar { display: none; }
             
-            /* Footer */
+            /* Footer / Creative CTA Area */
             #presentation-footer {
-                margin-top: 60px;
-                background: #fff;
+                margin-top: 50px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .cta-button {
+                background: linear-gradient(135deg, #0cebeb, #20e3b2, #29ffc6);
                 color: #000;
-                padding: 15px 40px;
+                padding: 15px 60px;
                 border-radius: 50px;
+                font-weight: 900;
+                font-size: 35px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                box-shadow: 0 0 30px rgba(32, 227, 178, 0.6);
+                animation: pulse-glow 2s infinite ease-in-out;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .cta-button::after {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: linear-gradient(45deg, transparent, rgba(255,255,255,0.8), transparent);
+                transform: rotate(45deg);
+                animation: sheen 3s infinite;
+            }
+            
+            .cta-subtext {
+                font-size: 20px;
+                color: #888;
                 font-weight: bold;
-                font-size: 30px;
+                letter-spacing: 3px;
+                text-transform: uppercase;
+                animation: fade-in-up 1s ease-out;
+            }
+            
+            @keyframes pulse-glow {
+                0% { transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }
+                50% { transform: scale(1.05); box-shadow: 0 0 60px rgba(32, 227, 178, 0.8); }
+                100% { transform: scale(1); box-shadow: 0 0 30px rgba(32, 227, 178, 0.4); }
+            }
+            
+            @keyframes sheen {
+                0% { left: -100%; }
+                20% { left: 200%; }
+                100% { left: 200%; }
             }
 
             /* AI Cursor */
@@ -186,9 +232,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         """)
         
         # 2. Re-structure the DOM
-        # We need to take all children of body and move them into #mockup-content
-        # Then put #mockup-content inside #mockup-frame inside #presentation-container
-        
         js_injection = f"""
             // Create the wrapper structure
             const container = document.createElement('div');
@@ -210,7 +253,18 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             
             const footer = document.createElement('div');
             footer.id = 'presentation-footer';
-            footer.innerText = 'DAILY INSPIRATION';
+            
+            // Dynamic CTA
+            const ctaBtn = document.createElement('div');
+            ctaBtn.className = 'cta-button';
+            ctaBtn.innerText = "{cta_text if cta_text else 'GET THIS TEMPLATE'}";
+            
+            const ctaSub = document.createElement('div');
+            ctaSub.className = 'cta-subtext';
+            ctaSub.innerText = "{cta_subtext if cta_subtext else 'LIMITED TIME OFFER'}";
+            
+            footer.appendChild(ctaBtn);
+            footer.appendChild(ctaSub);
             
             // Assemble
             frame.appendChild(innerContent);
@@ -241,8 +295,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             document.addEventListener('mouseup', () => c.style.transform = 'scale(1)');
             
             // Force Font Scale on Inner Content to look like mobile
-            // Since frame is 700px wide, and mobile is usually 360-ish.
-            // 700 / 360 = ~2x. 
             innerContent.style.fontSize = '200%'; 
         """
         

@@ -84,6 +84,8 @@ def main():
     # Extract Metadata
     overlay_text = script_data.get("overlay_text", "")
     overlay_header = script_data.get("overlay_header", "")
+    cta_text = script_data.get("cta_text", "GET STARTED")
+    cta_subtext = script_data.get("cta_subtext", "LINK IN BIO")
     
     if duration <= 0:
         print("Audio generation failed or returned 0 duration.")
@@ -94,7 +96,7 @@ def main():
     # 2. Record Video
     if os.path.exists(index_html):
         # We run the async recorder
-        asyncio.run(record_url(index_html, duration, raw_video, overlay_text=overlay_text, overlay_header=overlay_header))
+        asyncio.run(record_url(index_html, duration, raw_video, overlay_text=overlay_text, overlay_header=overlay_header, cta_text=cta_text, cta_subtext=cta_subtext))
     else:
             print(f"No index.html found for {folder}")
             return
