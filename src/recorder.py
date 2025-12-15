@@ -291,7 +291,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         
         async def get_wrapper_offset():
             return await page.evaluate("""() => {
-                const rect = document.getElementById('phone-wrapper').getBoundingClientRect();
+                const rect = document.getElementById('presentation-window').getBoundingClientRect();
                 return { x: rect.left, y: rect.top };
             }""")
             
