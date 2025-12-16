@@ -145,8 +145,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 }}
                 
                 /* --- PRESENTATION WINDOW (The "Screen") --- */
-                /* --- PRESENTATION WINDOW (The "Screen") --- */
-                #presentation-window {{
+                #presentation-window {
                     position: relative;
                     width: {CONTAINER_W}px;
                     height: {CONTAINER_H}px;
@@ -168,28 +167,30 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     /* Glass-like Edge Definition */
                     border: 4px solid rgba(255, 255, 255, 0.1);
                     display: flex; flex-direction: column;
-                }}
+                }
                 
                 /* Browser Mockup Header */
-                #browser-header {{
+                #browser-header {
                     height: 40px;
                     background: #f0f0f0;
                     border-bottom: 1px solid #ddd;
                     display: flex; align-items: center;
                     padding: 0 15px; gap: 10px;
-                }}
-                .browser-dot {{ width: 12px; height: 12px; border-radius: 50%; }}
-                .dot-red {{ background: #ff5f56; }}
-                .dot-yellow {{ background: #ffbd2e; }}
-                .dot-green {{ background: #27c93f; }}
-                .browser-bar {{
+                    flex-shrink: 0; /* Prevent header from shrinking */
+                }
+                .browser-dot { width: 12px; height: 12px; border-radius: 50%; }
+                .dot-red { background: #ff5f56; }
+                .dot-yellow { background: #ffbd2e; }
+                .dot-green { background: #27c93f; }
+                .browser-bar {
                     flex-grow: 1; height: 24px; background: #fff; border-radius: 4px;
                     margin-left: 10px; border: 1px solid #e0e0e0;
-                }}
+                }
                 
-                #content-iframe {{
+                #content-iframe {
                     width: {VIRTUAL_W}px;
-                    height: {int(CONTAINER_H / SCALE_FACTOR)}px; /* Logical Height */
+                    /* Subtract Header Height (40px) to fit perfectly */
+                    height: {int((CONTAINER_H - 40) / SCALE_FACTOR)}px; 
                     border: none;
                     background: #fff;
                     
