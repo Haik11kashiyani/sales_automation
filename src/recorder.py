@@ -100,14 +100,23 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 body {{
                     margin: 0; padding: 0;
                     width: 1080px; height: 1920px;
-                    background: #000;
+                    /* Premium Dark Aurora Background */
+                    background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #000000);
+                    background-size: 400% 400%;
+                    animation: gradientBG 15s ease infinite;
                     color: white;
                     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
                     overflow: hidden;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    justify-content: space-between; /* Header top, Footer bottom */
+                    justify-content: space-between;
+                }}
+                
+                @keyframes gradientBG {{
+                    0% {{ background-position: 0% 50%; }}
+                    50% {{ background-position: 100% 50%; }}
+                    100% {{ background-position: 0% 50%; }}
                 }}
                 
                 /* --- HEADER SECTION --- */
@@ -205,13 +214,15 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 
                 #ai-cursor {{
                     position: absolute; top: 0; left: 0;
-                    width: 32px; height: 32px;
+                    width: 35px; height: 35px;
+                    /* Glassmorphism Touch Indicator */
+                    background: rgba(255, 255, 255, 0.25);
+                    border: 2px solid rgba(255, 255, 255, 0.8);
+                    backdrop-filter: blur(4px);
                     border-radius: 50%;
-                    background: rgba(255, 50, 50, 0.8); /* Highly visible interaction point */
-                    border: 3px solid white;
                     pointer-events: none; z-index: 9999;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    transition: transform 0.1s;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    transition: transform 0.1s, background 0.2s;
                 }}
             </style>
         </head>
