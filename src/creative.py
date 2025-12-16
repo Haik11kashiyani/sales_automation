@@ -120,9 +120,9 @@ def generate_upload_metadata(script_text: str, hooks: dict):
             
             Output strictly JSON with keys: title, description, tags.
             Rules:
-            1. title: Catchy, under 60 chars, include 1 emoji.
-            2. description: Short marketing copy (2 sentences) + CTA.
-            3. tags: String of 15 relevant hashtags.
+            1. title: Catchy, under 60 chars. MUST include a short CTA like "Get Code" or "Link in Bio" or "Watch Now". Include 1 emoji.
+            2. description: FIRST LINE must be the Call To Action (e.g. "🚀 Get this template: Link in Bio"). Then 2 sentences of value.
+            3. tags: String of 15 relevant hashtags including #webdesign.
             """
             
             payload = {
