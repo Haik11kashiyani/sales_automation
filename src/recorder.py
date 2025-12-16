@@ -316,7 +316,8 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         start_time = time.time()
         
         # Move mouse to center initially
-        cx, cy = frame_to_viewport(MOBILE_W / 2, MOBILE_H / 2)
+        virtual_h = int(CONTAINER_H / SCALE_FACTOR)
+        cx, cy = frame_to_viewport(VIRTUAL_W / 2, virtual_h / 2)
         await page.mouse.move(cx, cy)
         
         while True:
