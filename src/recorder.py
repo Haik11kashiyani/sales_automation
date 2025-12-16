@@ -100,8 +100,8 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 body {{
                     margin: 0; padding: 0;
                     width: 1080px; height: 1920px;
-                    /* Premium Dark Aurora Background */
-                    background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #000000);
+                    /* VIBRANT Background - Distinctly NOT Black */
+                    background: linear-gradient(-45deg, #1a1a2e, #16213e, #4a1c40, #1a1a2e);
                     background-size: 400% 400%;
                     animation: gradientBG 15s ease infinite;
                     color: white;
@@ -214,14 +214,13 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 
                 #ai-cursor {{
                     position: absolute; top: 0; left: 0;
-                    width: 35px; height: 35px;
-                    /* Glassmorphism Touch Indicator */
-                    background: rgba(255, 255, 255, 0.25);
-                    border: 2px solid rgba(255, 255, 255, 0.8);
-                    backdrop-filter: blur(4px);
+                    width: 30px; height: 30px;
+                    /* High Visibility Touch Indicator - Solid White */
+                    background: #ffffff;
+                    border: 2px solid rgba(0, 0, 0, 0.1);
                     border-radius: 50%;
                     pointer-events: none; z-index: 9999;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
                     transition: transform 0.1s, background 0.2s;
                 }}
             </style>
