@@ -145,6 +145,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 }}
                 
                 /* --- PRESENTATION WINDOW (The "Screen") --- */
+                /* --- PRESENTATION WINDOW (The "Screen") --- */
                 #presentation-window {{
                     position: relative;
                     width: {CONTAINER_W}px;
@@ -164,8 +165,26 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     /* Subtle "High-End" Border Radius */
                     border-radius: 16px; 
                     
-                    /* Glass-like Edge Definition (The "Not Blended" Fix) */
+                    /* Glass-like Edge Definition */
                     border: 4px solid rgba(255, 255, 255, 0.1);
+                    display: flex; flex-direction: column;
+                }}
+                
+                /* Browser Mockup Header */
+                #browser-header {{
+                    height: 40px;
+                    background: #f0f0f0;
+                    border-bottom: 1px solid #ddd;
+                    display: flex; align-items: center;
+                    padding: 0 15px; gap: 10px;
+                }}
+                .browser-dot {{ width: 12px; height: 12px; border-radius: 50%; }}
+                .dot-red {{ background: #ff5f56; }}
+                .dot-yellow {{ background: #ffbd2e; }}
+                .dot-green {{ background: #27c93f; }}
+                .browser-bar {{
+                    flex-grow: 1; height: 24px; background: #fff; border-radius: 4px;
+                    margin-left: 10px; border: 1px solid #e0e0e0;
                 }}
                 
                 #content-iframe {{
@@ -238,6 +257,12 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             </div>
             
             <div id="presentation-window">
+                <div id="browser-header">
+                    <div class="browser-dot dot-red"></div>
+                    <div class="browser-dot dot-yellow"></div>
+                    <div class="browser-dot dot-green"></div>
+                    <div class="browser-bar"></div>
+                </div>
                 <iframe id="content-iframe" src="{target_url}" scrolling="yes"></iframe>
             </div>
             
