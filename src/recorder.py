@@ -371,8 +371,9 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 else:
                     await page.wait_for_timeout(random.randint(200, 500))
             
-            # SCROLLING
-            # We need to ensure we reach the END of the page within the duration.
+            # SCROLLING - BUTTER SMOOTH
+            # Instead of jumpy steps, use native smooth scrolling with calculated pauses.
+            
             # 1. Check current progress
             scroll_info = await content_frame.evaluate("""() => {
                 return {
@@ -382,24 +383,25 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 };
             }""")
             
-            # 2. Dynamic Scroll Step based on remaining distance and time
-            # But simple robust approach: just scroll aggressively if needed.
-            
             remaining_dist = scroll_info['total'] - (scroll_info['current'] + scroll_info['view'])
             
             if remaining_dist > 50:
-                # Scroll Logic
-                step = random.randint(150, 400) # Faster scrolling
-                await content_frame.evaluate(f"window.scrollBy(0, {step})")
-                await page.wait_for_timeout(random.randint(400, 800))
+                # Smooth Scroll Logic
+                # We scroll a smaller chunk but smoother.
+                step = random.randint(250, 450) 
+                
+                # Execute Smooth Scroll
+                await content_frame.evaluate(f"window.scrollBy({{top: {step}, left: 0, behavior: 'smooth'}})")
+                
+                # Wait for the smooth scroll to complete visually
+                # Browser smooth scroll takes time (approx 300-500ms).
+                await page.wait_for_timeout(random.randint(800, 1200)) # Pause to let user read content
             else:
-                # Reached bottom! Pause then maybe scroll up a tiny bit or end?
-                # Just wait out the duration or break if time is up.
                 await page.wait_for_timeout(1000)
                 
             # Time check
             if time.time() - start_time > duration + 5:
-                # Force one last scroll to bottom just in case?
+                # Force one last smooth scroll to bottom?
                 break
                 
         await context.close()
