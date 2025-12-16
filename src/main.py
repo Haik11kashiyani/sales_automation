@@ -7,30 +7,18 @@ from editor import assemble_video
 import argparse
 
 from recorder import record_url, run_server_in_thread
-from creative import generate_viral_hooks
-import time
+import shutil
+from creative import generate_viral_hooks, generate_upload_metadata
 
-# Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONTENT_POOL = os.path.join(BASE_DIR, "content_pool")
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-
-# Start Local Server (Daemon)
-try:
-    run_server_in_thread()
-    time.sleep(2) # Warmup
-except Exception as e:
-    print(f"Server start warning: {e}")
-
-def get_content_folders():
-    return [f for f in os.listdir(CONTENT_POOL) if os.path.isdir(os.path.join(CONTENT_POOL, f))]
+# ... [imports] ...
 
 def main():
+    BATCH_SIZE = 3
+    
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
     previous_history = []
-    # Persistent history file in 'data' folder (must be committed)
     data_dir = os.path.join(BASE_DIR, "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -43,104 +31,99 @@ def main():
             except:
                 previous_history = []
     
-    # Get list of folders
+    # Get all folders
     folders = get_content_folders()
-    
-    # Sort folders to ensure deterministic order (optional)
     folders.sort()
     
-    # Scheduling Logic: Pick ONE folder that hasn't been done
-    target_folder = None
-    for folder in folders:
-        if folder not in previous_history:
-            target_folder = folder
-            break
-            
-    if not target_folder:
+    # Filter pending
+    pending_folders = [f for f in folders if f not in previous_history]
+    
+    if not pending_folders:
         print("No new content to process! All folders in history.")
         return
 
-    print(f"Selected for this run: {target_folder}")
+    # Select Batch
+    batch = pending_folders[:BATCH_SIZE]
+    print(f"🚀 Starting Batch Run: {len(batch)} videos ({batch})")
     
-    folder = target_folder
-    folder_path = os.path.join(CONTENT_POOL, folder)
-    index_html = os.path.join(folder_path, "index.html")
-    script_json = os.path.join(folder_path, "script.json")
-    
-    # Output filenames
-    raw_video = os.path.join(OUTPUT_DIR, f"raw_{folder}.mp4")
-    voiceover = os.path.join(OUTPUT_DIR, f"voice_{folder}.mp3")
-    final_video = os.path.join(OUTPUT_DIR, f"final_{folder}.mp4")
-    
-    # 1. Read Script Data
-    script_data = {}
-    if os.path.exists(script_json):
-        with open(script_json, 'r') as f:
-            script_data = json.load(f)
-        duration = generate_voiceover(script_json, voiceover)
-    else:
-        print(f"No script.json found for {folder}, skipping.")
-        return
-
-        return
-
-    # Extract Metadata
-    # 1. Start with Script Defaults (base source of truth)
-    overlay_text = script_data.get("overlay_text", "")
-    overlay_header = script_data.get("overlay_header", "")
-    cta_text = script_data.get("cta_text", "")
-    cta_subtext = script_data.get("cta_subtext", "")
-    
-    # 2. Apply Creative Engine (Variety Injection)
-    # We pass the narration text to the AI to generate relevant hooks
-    # If script.json has explicit values, we might want to keep them OR override them for variety.
-    # Strategy: If values are empty OR we want forced variety, call generator.
-    # Let's assume we ALWAYS call generator to fill in blanks or add variety if script defaults are generic.
-    
-    narration_preview = script_data.get("narration", "")
-    viral_hooks = generate_viral_hooks(narration_preview)
-    
-    # Priority: Script.json > AI/Creative > Default
-    # Actually user wants "different for each short". So Creative > Script?
-    # Let's do: If script.json has value, use it (manual override). Else use Creative.
-    # UNLESS user enables "FORCE_VARIETY" flag.
-    # For now, let's auto-fill if empty, or mix. 
-    # User said "add generated those text".
-    
-    if not overlay_text: overlay_text = viral_hooks.get("overlay_text")
-    if not overlay_header: overlay_header = viral_hooks.get("overlay_header")
-    if not cta_text: cta_text = viral_hooks.get("cta_text")
-    if not cta_subtext: cta_subtext = viral_hooks.get("cta_subtext")
-    
-    # Log the hooks for this run
-    print(f"🎬 VIDEO METADATA:\nHeader: {overlay_header}\nTitle: {overlay_text}\nCTA: {cta_text}\nSub: {cta_subtext}")
-    
-    if duration <= 0:
-        print("Audio generation failed or returned 0 duration.")
-        # Fallback
-        duration = script_data.get("video_duration_override", 30)
-        print(f"Using fallback duration: {duration}s")
-
-    # 2. Record Video
-    if os.path.exists(index_html):
-        # We run the async recorder
-        asyncio.run(record_url(index_html, duration, raw_video, overlay_text=overlay_text, overlay_header=overlay_header, cta_text=cta_text, cta_subtext=cta_subtext))
-    else:
-            print(f"No index.html found for {folder}")
-            return
-
-    # 3. Assemble
-    if os.path.exists(raw_video) and os.path.exists(voiceover):
-        assemble_video(raw_video, voiceover, final_video)
+    for folder in batch:
+        print(f"\n🎥 Processing: {folder}")
+        folder_path = os.path.join(CONTENT_POOL, folder)
+        index_html = os.path.join(folder_path, "index.html")
+        script_json = os.path.join(folder_path, "script.json")
         
-        # 4. Update History
-        previous_history.append(folder)
-        with open(history_file, 'w') as f:
-            json.dump(previous_history, f)
-            print(f"Updated history: {folder} marked as done.")
-    else:
-        print("Missing raw video or voiceover, cannot assemble.")
+        # Output paths
+        raw_video = os.path.join(OUTPUT_DIR, f"raw_{folder}.mp4")
+        voiceover = os.path.join(OUTPUT_DIR, f"voice_{folder}.mp3")
+        final_video = os.path.join(OUTPUT_DIR, f"final_{folder}.mp4")
+        meta_file = os.path.join(OUTPUT_DIR, f"metadata_{folder}.json")
 
+        if not os.path.exists(index_html):
+            print(f"Skipping {folder}: No index.html")
+            continue
+
+        # 1. Script & Audio Strategy
+        script_data = {}
+        duration = 30 # Default
+        has_audio = False
+        
+        if os.path.exists(script_json):
+            with open(script_json, 'r') as f:
+                script_data = json.load(f)
+            
+            narration = script_data.get("narration", "")
+            if narration and len(narration.strip()) > 5:
+                # Narrated Mode
+                try:
+                    duration = generate_voiceover(script_json, voiceover)
+                    if duration > 0: has_audio = True
+                except Exception as e:
+                    print(f"Audio failed, defaulting to Silent Mode: {e}")
+            else:
+                # Silent / Trending Music Mode
+                print("Silent Mode Active (Trend Music Strategy)")
+                duration = script_data.get("video_duration_override", 30)
+
+        # 2. Viral Hooks & Metadata
+        hooks = generate_viral_hooks(script_data.get("narration", ""))
+        
+        # Merge hooks with script defaults
+        overlay_text = script_data.get("overlay_text") or hooks.get("overlay_text")
+        overlay_header = script_data.get("overlay_header") or hooks.get("overlay_header")
+        cta_text = script_data.get("cta_text") or hooks.get("cta_text")
+        cta_subtext = script_data.get("cta_subtext") or hooks.get("cta_subtext")
+        
+        # Generate & Save YouTube Metadata (Title/Tags)
+        yt_meta = generate_upload_metadata(script_data.get("narration", ""), hooks)
+        with open(meta_file, 'w') as f:
+            json.dump(yt_meta, f, indent=2)
+        print(f"✅ Metadata saved to {meta_file}")
+
+        # 3. Record Video
+        print(f"Recording {folder} for {duration}s...")
+        asyncio.run(record_url(index_html, duration, raw_video, 
+                               overlay_text=overlay_text, 
+                               overlay_header=overlay_header, 
+                               cta_text=cta_text, 
+                               cta_subtext=cta_subtext))
+
+        # 4. Finalize
+        if os.path.exists(raw_video):
+            if has_audio and os.path.exists(voiceover):
+                assemble_video(raw_video, voiceover, final_video)
+            else:
+                # Silent Finalization
+                shutil.copy(raw_video, final_video)
+                print(f"Silent video ready: {final_video}")
+            
+            # Update History
+            previous_history.append(folder)
+            with open(history_file, 'w') as f:
+                json.dump(previous_history, f)
+        else:
+            print("Recording failed, skipping assembly.")
+            
+    print("\n✅ Batch Run Complete.")
 
 if __name__ == "__main__":
     main()
