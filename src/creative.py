@@ -93,5 +93,62 @@ def generate_viral_hooks(script_text: str = ""):
     
     return hooks
 
+def generate_upload_metadata(script_text: str, hooks: dict):
+    """
+    Generates YouTube Short Title, Description, and Tags.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    
+    metadata = {
+        "title": f"{hooks.get('overlay_header')} - {hooks.get('overlay_text')}",
+        "description": f"Check out this amazing design! {hooks.get('cta_text')} in bio.",
+        "tags": "#webdesign #uiux #coding"
+    }
+    
+    if api_key:
+        try:
+            print("✨ Generative Metadata...")
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            prompt = f"""
+            Generate YouTube Shorts metadata for this video.
+            Context: {script_text[:300]}
+            Hooks: {hooks}
+            
+            Output strictly JSON with keys: title, description, tags.
+            Rules:
+            1. title: Catchy, under 60 chars, include 1 emoji.
+            2. description: Short marketing copy (2 sentences) + CTA.
+            3. tags: String of 15 relevant hashtags.
+            """
+            
+            payload = {
+                "model": "google/gemini-2.0-flash-exp:free",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            
+            response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                content = data['choices'][0]['message']['content']
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0]
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0]
+                
+                ai_meta = json.loads(content.strip())
+                metadata.update(ai_meta)
+                print("✅ Generated Metadata")
+                return metadata
+                
+        except Exception as e:
+            print(f"⚠️ Metadata Generation failed: {e}")
+            
+    return metadata
+
 if __name__ == "__main__":
-    print(generate_viral_hooks("Test script about a cool website with gsap animations."))
+    print(generate_viral_hooks("Test script"))
