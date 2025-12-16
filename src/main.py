@@ -50,7 +50,13 @@ def main():
     folders.sort()
     
     # Filter pending
-    pending_folders = [f for f in folders if f not in previous_history]
+    # pending_folders = [f for f in folders if f not in previous_history]
+    
+    # DEBUG: Force Run All for Verification
+    print(f"DEBUG: All Folders: {folders}")
+    print(f"DEBUG: History: {previous_history}")
+    print("DEBUG: Forcing run of ALL folders to ensure artifact generation.")
+    pending_folders = folders 
     
     if not pending_folders:
         print("No new content to process! All folders in history.")

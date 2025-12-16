@@ -453,16 +453,25 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 # Force one last smooth scroll to bottom?
                 break
                 
-        await context.close()
+        # Save Video Logic - Correct Sequence
+        video = page.video
+        await context.close() # Writes video to disk
+        
+        saved_video_path = None
+        if video:
+            saved_video_path = await video.path()
+            
         await browser.close()
         
-        # Save Video logic (similar to before, assuming Context recorded it)
-        saved_video_path = await page.video.path()
         if saved_video_path:
              if os.path.exists(output_path):
                  os.remove(output_path)
-             os.rename(saved_video_path, output_path)
+             # Use shutil for cross-filesystem safety
+             import shutil
+             shutil.move(saved_video_path, output_path)
              print(f"Video saved to {output_path}")
+        else:
+            print("Error: No video recorded.")
 
 if __name__ == "__main__":
     # Test execution
