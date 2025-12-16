@@ -226,7 +226,8 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     border-radius: 50%;
                     pointer-events: none; z-index: 9999;
                     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                    transition: transform 0.1s, background 0.2s;
+                    transition: transform 0.1s, background 0.2s, opacity 0.3s;
+                    opacity: 0; /* Hidden by default to prevent 0,0 glitch */
                 }}
             </style>
         </head>
@@ -250,7 +251,13 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             <script>
                 // Cursor Logic
                 const c = document.getElementById('ai-cursor');
+                let isVisible = false;
+                
                 document.addEventListener('mousemove', e => {{
+                    if (!isVisible) {{
+                        c.style.opacity = '1';
+                        isVisible = true;
+                    }}
                     c.style.left = e.clientX + 'px';
                     c.style.top = e.clientY + 'px';
                 }});
