@@ -66,11 +66,19 @@ def main():
     batch = pending_folders[:BATCH_SIZE]
     print(f"🚀 Starting Batch Run: {len(batch)} videos ({batch})")
     
+    # DEBUG: Create a token file to verify Output Write Access & Artifact Upload
+    with open(os.path.join(OUTPUT_DIR, 'debug_token.txt'), 'w') as f:
+        f.write(f"Run started at {time.time()}\nBatch: {batch}\nExisting Output: {os.listdir(OUTPUT_DIR) if os.path.exists(OUTPUT_DIR) else 'None'}")
+    
     for folder in batch:
         print(f"\n🎥 Processing: {folder}")
         folder_path = os.path.join(CONTENT_POOL, folder)
         index_html = os.path.join(folder_path, "index.html")
         script_json = os.path.join(folder_path, "script.json")
+        
+        # Verify Paths
+        print(f"   path: {folder_path}")
+        print(f"   html: {index_html} (Exists: {os.path.exists(index_html)})")
         
         # Output paths
         raw_video = os.path.join(OUTPUT_DIR, f"raw_{folder}.mp4")
@@ -79,9 +87,10 @@ def main():
         meta_file = os.path.join(OUTPUT_DIR, f"metadata_{folder}.json")
 
         if not os.path.exists(index_html):
-            print(f"Skipping {folder}: No index.html")
+            print(f"⚠️ Skipping {folder}: No index.html found at {index_html}")
             continue
 
+        # ... (Script/Audio Logic skipped for brevity, keeps existing) ...
         # 1. Script & Audio Strategy
         script_data = {}
         duration = 30 # Default
@@ -100,35 +109,45 @@ def main():
                 except Exception as e:
                     print(f"Audio failed, defaulting to Silent Mode: {e}")
             else:
-                # Silent / Trending Music Mode
                 print("Silent Mode Active (Trend Music Strategy)")
                 duration = script_data.get("video_duration_override", 30)
 
         # 2. Viral Hooks & Metadata
         hooks = generate_viral_hooks(script_data.get("narration", ""))
         
-        # Merge hooks with script defaults
+        # Merge hooks
         overlay_text = script_data.get("overlay_text") or hooks.get("overlay_text")
         overlay_header = script_data.get("overlay_header") or hooks.get("overlay_header")
         cta_text = script_data.get("cta_text") or hooks.get("cta_text")
         cta_subtext = script_data.get("cta_subtext") or hooks.get("cta_subtext")
         
-        # Generate & Save YouTube Metadata (Title/Tags)
+        # Save Metadata
         yt_meta = generate_upload_metadata(script_data.get("narration", ""), hooks)
         with open(meta_file, 'w') as f:
             json.dump(yt_meta, f, indent=2)
         print(f"✅ Metadata saved to {meta_file}")
 
         # 3. Record Video
-        print(f"Recording {folder} for {duration}s...")
-        asyncio.run(record_url(index_html, duration, raw_video, 
-                               overlay_text=overlay_text, 
-                               overlay_header=overlay_header, 
-                               cta_text=cta_text, 
-                               cta_subtext=cta_subtext))
+        print(f"Recording {folder} for {duration}s to {raw_video}...")
+        try:
+            asyncio.run(record_url(index_html, duration, raw_video, 
+                                   overlay_text=overlay_text, 
+                                   overlay_header=overlay_header, 
+                                   cta_text=cta_text, 
+                                   cta_subtext=cta_subtext))
+        except Exception as e:
+            print(f"❌ RECORDING FAILED for {folder}: {e}")
+            import traceback
+            traceback.print_exc()
 
         # 4. Finalize
         if os.path.exists(raw_video):
+            # Check file size
+            size = os.path.getsize(raw_video)
+            print(f"   Raw Video Created: {size} bytes")
+            if size < 1000:
+                 print("⚠️ Warning: Video file is suspiciously small.")
+            
             if has_audio and os.path.exists(voiceover):
                 assemble_video(raw_video, voiceover, final_video)
             else:
@@ -136,14 +155,15 @@ def main():
                 shutil.copy(raw_video, final_video)
                 print(f"Silent video ready: {final_video}")
             
-            # Update History
-            previous_history.append(folder)
-            with open(history_file, 'w') as f:
-                json.dump(previous_history, f)
+            # Update History (Temporarily disabled for debug)
+            # previous_history.append(folder)
+            # with open(history_file, 'w') as f:
+            #     json.dump(previous_history, f)
         else:
-            print("Recording failed, skipping assembly.")
+            print(f"❌ Critical: Raw video file not found at {raw_video}")
             
-    print("\n✅ Batch Run Complete.")
+    print("\n✅ Batch Run Complete. Directory Listing of Output:")
+    print(os.listdir(OUTPUT_DIR))
 
 if __name__ == "__main__":
     main()
