@@ -145,7 +145,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 }}
                 
                 /* --- PRESENTATION WINDOW (The "Screen") --- */
-                #presentation-window {
+                #presentation-window {{
                     position: relative;
                     width: {CONTAINER_W}px;
                     height: {CONTAINER_H}px;
@@ -166,7 +166,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     
                     /* Glass-like Edge Definition (The "Not Blended" Fix) */
                     border: 4px solid rgba(255, 255, 255, 0.1);
-                }}
+                }}}
                 
                 #content-iframe {{
                     width: {VIRTUAL_W}px;
