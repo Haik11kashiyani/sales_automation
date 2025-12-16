@@ -9,8 +9,22 @@ import argparse
 from recorder import record_url, run_server_in_thread
 import shutil
 from creative import generate_viral_hooks, generate_upload_metadata
+import time
 
-# ... [imports] ...
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONTENT_POOL = os.path.join(BASE_DIR, "content_pool")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+
+# Start Local Server (Daemon)
+try:
+    run_server_in_thread()
+    time.sleep(2) # Warmup
+except Exception as e:
+    print(f"Server start warning: {e}")
+
+def get_content_folders():
+    return [f for f in os.listdir(CONTENT_POOL) if os.path.isdir(os.path.join(CONTENT_POOL, f))]
 
 def main():
     BATCH_SIZE = 3
