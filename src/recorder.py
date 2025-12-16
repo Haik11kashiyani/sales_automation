@@ -145,22 +145,27 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 }}
                 
                 /* --- PRESENTATION WINDOW (The "Screen") --- */
-                #presentation-window {{
+                #presentation-window {
                     position: relative;
                     width: {CONTAINER_W}px;
                     height: {CONTAINER_H}px;
                     
-                    /* Clean Window Styling - No Phone Artifacts */
+                    /* Premium "Pop" Styling */
                     background: #fff;
-                    box-shadow: 0 20px 80px rgba(0,0,0,0.5); /* Deep shadow lift */
-                    overflow: hidden; /* No cutting -> Containment */
                     
-                    /* Optional: Subtle rounded corners for modern "Card" feel? */
-                    /* User said "Central Squared fit". Let's keep it sharp or very minimal radius. */
-                    border-radius: 12px; 
+                    /* Deep, Multi-layered Shadow for Maximum Separation */
+                    box-shadow: 
+                        0 0 0 1px rgba(0,0,0, 0.8), /* Crisp black line */
+                        0 30px 80px rgba(0,0,0, 0.7), /* Deep Ambient */
+                        0 0 150px rgba(0,0,0, 0.9); /* Void Separation */
+                        
+                    overflow: hidden; 
                     
-                    /* Border to define edges against dark bg */
-                    border: 1px solid #333;
+                    /* Subtle "High-End" Border Radius */
+                    border-radius: 16px; 
+                    
+                    /* Glass-like Edge Definition (The "Not Blended" Fix) */
+                    border: 4px solid rgba(255, 255, 255, 0.1);
                 }}
                 
                 #content-iframe {{
