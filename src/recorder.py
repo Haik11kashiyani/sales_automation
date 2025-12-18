@@ -398,8 +398,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         current_y = 960 # Middle of 1920
         await page.mouse.move(current_x, current_y)
 
-        # --- PROFESSIONAL PRESENTATION SCRIPT ---
-        # Instead of random wandering, we perform a scripted "Perfect Demo".
+        # --- PROFESSIONAL PRESENTATION SCRIPT (UPDATED FOR NEW PORTFOLIO) ---
         
         async def move_and_hover(selector, hover_duration=1.0):
              """Finds an element in the frame, moves to it smoothly, and hovers."""
@@ -419,75 +418,70 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                  print(f"Prop Move Failed: {e}")
              return current_x, current_y
 
-        # 1. HERO PHASE (0-5s)
-        # Stay near center, let user read the Big Title
+        # 1. HERO PHASE (0-4s) - Loading & Intro
         print("Phase 1: Hero")
+        await asyncio.sleep(3.5) # Wait for Shutter/Loading animation
+        # Move to "View All Work" button just to hint action
+        current_x, current_y = await move_and_hover(".liquid-btn")
+        await asyncio.sleep(1.0) 
+
+        # 2. ABOUT PHASE (4-8s)
+        print("Phase 2: About")
+        await content_frame.evaluate("window.scrollTo({top: window.innerHeight * 0.9, behavior: 'smooth'})")
         await asyncio.sleep(2.0)
-        # Gentle float down
-        await human_move(current_x, current_y, current_x, current_y + 100, steps=100)
-        current_y += 100
-        await asyncio.sleep(1.5)
-
-        # 2. SOCIAL PROOF (5-8s)
-        print("Phase 2: Social Proof")
-        # Scroll down to reveal Marquee (approx 800px)
-        await content_frame.evaluate("window.scrollTo({top: 600, behavior: 'smooth'})")
-        await asyncio.sleep(1.0) # Wait for scroll
-        # Move mouse to follow the marquee (left to right)
-        await human_move(current_x, current_y, 200, 1000, steps=40) # Left side
-        await human_move(200, 1000, 800, 1000, steps=120) # Slow pan right
-        current_x, current_y = 800, 1000
-
-        # 3. FEATURES PHASE (8-18s)
-        print("Phase 3: Features")
-        await content_frame.evaluate("window.scrollTo({top: 1400, behavior: 'smooth'})")
+        # Read the text (Slow pan)
+        await human_move(current_x, current_y, 800, 500, steps=80)
+        
+        # 3. PROCESS PHASE (8-14s)
+        print("Phase 3: Process")
+        await content_frame.evaluate("window.scrollTo({top: window.innerHeight * 1.8, behavior: 'smooth'})")
         await asyncio.sleep(1.5)
         
-        # Explicitly hover the 3 cards
-        # We need to know specific selectors or just use logic
-        # Let's target by class index if possible, or just generic locations
-        # Card 1 (Left/Top)
-        current_x, current_y = await move_and_hover(".feature-card:nth-child(1)")
-        await asyncio.sleep(1.5) # Let them read
-        
-        # Card 2 (Middle)
-        current_x, current_y = await move_and_hover(".feature-card:nth-child(2)")
-        await asyncio.sleep(1.5)
-        
-        # Card 3 (Right/Bottom)
-        current_x, current_y = await move_and_hover(".feature-card:nth-child(3)")
-        await asyncio.sleep(1.5)
+        # Hover over Process Steps to trigger dots
+        steps = [".process-step:nth-child(1)", ".process-step:nth-child(3)", ".process-step:nth-child(5)"]
+        for step in steps:
+            await move_and_hover(step, hover_duration=0.5)
+            await asyncio.sleep(0.5)
 
-        # 4. STATS PHASE (18-24s)
-        print("Phase 4: Stats")
-        await content_frame.evaluate("window.scrollTo({top: 2200, behavior: 'smooth'})")
+        # 4. TECH ARSENAL (14-17s)
+        print("Phase 4: Tech Arsenal")
+        await content_frame.evaluate("document.getElementById('tech').scrollIntoView({behavior: 'smooth'})")
+        await asyncio.sleep(1.5)
+        # Move mouse rapidly across columns to affect the speed (if interactive)
+        await human_move(200, 500, 800, 500, steps=20)
         await asyncio.sleep(1.0)
         
-        # Highlight the "98%"
-        current_x, current_y = await move_and_hover(".stat-item:nth-child(2) h2")
-        # Wiggle for emphasis
-        for _ in range(10):
-             await page.mouse.move(current_x + random.randint(-5,5), current_y + random.randint(-5,5))
-             await asyncio.sleep(0.05)
+        # 5. PROJECTS SLIDER (17-25s)
+        print("Phase 5: Projects ( pinned )")
+        await content_frame.evaluate("document.getElementById('projects').scrollIntoView({behavior: 'smooth'})")
         await asyncio.sleep(1.0)
-
-        # 5. CTA PHASE (24-30s)
-        print("Phase 5: CTA")
-        # Scroll to bottom
-        await content_frame.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})")
+        
+        # Scroll DEEP to animate the pinned slider
+        # We need to scroll approx 3-4 viewports worth
+        for _ in range(5):
+             await content_frame.evaluate("window.scrollBy({top: window.innerHeight * 0.8, left: 0, behavior: 'smooth'})")
+             await asyncio.sleep(1.2) # Wait for slide transition
+        
+        # 6. STATS / AUTHORITY (25-28s)
+        print("Phase 6: Authority")
+        await content_frame.evaluate("document.getElementById('authority').scrollIntoView({behavior: 'smooth'})")
         await asyncio.sleep(1.5)
         
-        # Target the final button
-        current_x, current_y = await move_and_hover(".cta-btn")
-        await asyncio.sleep(0.5)
+        # Trigger Spotlight Effect
+        box = await move_and_hover(".stat-box:nth-child(2)") # Projects Shipped
+        # Wiggle to show spotlight
+        for _ in range(15):
+             await page.mouse.move(current_x + random.randint(-50,50), current_y + random.randint(-50,50))
+             await asyncio.sleep(0.02)
+             
+        # 7. CONTACT (28-30s)
+        print("Phase 7: Contact")
+        await content_frame.evaluate("document.getElementById('contact-form-section').scrollIntoView({behavior: 'smooth'})")
+        await asyncio.sleep(1.0)
         
-        # Click effect
-        await page.mouse.down()
-        await page.wait_for_timeout(150)
-        await page.mouse.up()
-        
-        # Hold on the 'clicked' state
-        await asyncio.sleep(2.0)
+        # Hover Submit
+        await move_and_hover(".submit-btn")
+        await asyncio.sleep(1.0)
         
         # End of Script
                 

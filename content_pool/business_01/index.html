@@ -1,361 +1,1363 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code-to-Reality Engine</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <title>Hardik | Creative Developer</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://fonts.cdnfonts.com/css/baron-2" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
+        /* 1. THEME VARIABLES */
         :root {
-            --primary: #00ff88;
-            --bg: #0a0a0a;
+            --bg: #050505;
             --text: #ffffff;
+            --accent: #FF3B30;
+            --border: rgba(255, 255, 255, 0.2);
+            --glass: rgba(255, 255, 255, 0.1);
+            --font-display: 'Baron Neue', sans-serif;
+            --font-body: 'Inter', sans-serif;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border_box;
-            font-family: 'Inter', sans-serif;
+        [data-theme="light"] {
+            --bg: #E0E0E0;
+            --text: #000000;
+            --accent: #FF3B30;
+            --border: rgba(0, 0, 0, 1);
+            --glass: rgba(0, 0, 0, 0.05);
         }
 
         body {
             background-color: var(--bg);
             color: var(--text);
+            font-family: var(--font-body);
+            cursor: none;
             overflow-x: hidden;
+            margin: 0;
+            transition: background-color 0.5s ease, color 0.5s ease;
         }
 
-        section {
-            height: 100vh;
+        h1,
+        h2,
+        h3,
+        .nav-link,
+        .hero-text,
+        .tech-item,
+        .section-title,
+        .stat-number {
+            font-family: var(--font-display);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        /* 2. CURSOR */
+        #cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 15px;
+            height: 15px;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 2rem;
+            mix-blend-mode: difference;
+        }
+
+        #cursor-follower {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 50px;
+            border: 1px solid var(--text);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9998;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s, transform 0.1s;
+            opacity: 0.5;
+        }
+
+        body.cursor-hover #cursor {
+            width: 80px;
+            height: 80px;
+        }
+
+        body.cursor-hover #cursor-follower {
+            opacity: 0;
+        }
+
+        /* ARROW CURSOR STATE (For Last Section) */
+        body.cursor-arrow #cursor {
+            width: 100px;
+            height: 100px;
+            background: var(--accent);
+            mix-blend-mode: normal;
+            color: white;
+        }
+
+        body.cursor-arrow #cursor::after {
+            content: '\f061';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 2rem;
+            transform: rotate(90deg);
+        }
+
+        body.cursor-arrow #cursor-follower {
+            opacity: 0;
+        }
+
+        /* 3. HERO FIX */
+        .availability-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 24px;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-weight: 600;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            margin-bottom: 2rem;
+            opacity: 0;
+            animation: fadeInDown 1s ease forwards 0.5s;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 4. PROCESS SECTION (POLISHED) */
+        #process {
+            position: relative;
+            padding: 200px 0;
+            overflow: hidden;
+        }
+
+        .process-svg-container {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            /* Track */
+            overflow: hidden;
+        }
+
+        .process-line-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--accent);
+            transform: scaleY(0);
+            transform-origin: top;
+        }
+
+        /* Removed old SVG classes (.process-line) */
+
+        .process-step {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 150px auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        .process-step:nth-child(even) {
+            flex-direction: row-reverse;
+            text-align: right;
+        }
+
+        .step-content {
+            width: 40%;
+        }
+
+        .step-num {
+            font-size: 8rem;
+            opacity: 0.05;
+            font-weight: bold;
+            font-family: var(--font-display);
+            line-height: 0.8;
+            position: absolute;
+            top: -40px;
+            left: 0;
+        }
+
+        .process-step:nth-child(even) .step-num {
+            left: auto;
+            right: 0;
+        }
+
+        .step-title {
+            font-size: 3rem;
+            margin-bottom: 1rem;
             position: relative;
         }
 
-        h1 {
-            font-size: 4rem;
-            text-align: center;
-            background: linear-gradient(45deg, var(--primary), #00ccff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 2rem;
-            opacity: 0;
-            transform: translateY(50px);
-        }
-
-        p {
-            font-size: 1.5rem;
-            text-align: center;
-            max-width: 600px;
-            margin-bottom: 3rem;
-            opacity: 0;
-            transform: translateY(30px);
+        .step-desc {
+            font-size: 1.1rem;
+            opacity: 0.7;
             line-height: 1.6;
         }
 
-        .card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 2rem;
-            margin: 1rem;
-            width: 80%;
-            opacity: 0;
-            transform: scale(0.8);
-            backdrop-filter: blur(10px);
+        .step-dot {
+            width: 20px;
+            height: 20px;
+            background: var(--bg);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            top: 20px;
+            transform: translateX(-50%);
+            z-index: 3;
+            transition: background-color 0.3s;
         }
 
-        .feature-grid {
+        .process-step:hover .step-dot {
+            background: var(--accent);
+        }
+
+        /* 5. AUTHORITY GRID (SPOTLIGHT EFFECT) */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            background: transparent;
+            border: none;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            padding: 60px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s;
+            border-radius: 12px;
+        }
+
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(800px circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(255, 255, 255, 0.06), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .stat-box:hover::before {
+            opacity: 1;
+        }
+
+        .stat-box:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .stat-number {
+            font-size: 5rem;
+            color: var(--text);
+            line-height: 1;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .stat-label {
+            opacity: 0.5;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cv-download-btn {
+            margin-top: 50px;
+            padding: 20px 60px;
+            border: 1px solid var(--border);
+            background: var(--glass);
+            color: var(--text);
+            font-family: var(--font-display);
+            font-size: 1rem;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.3s;
+            border-radius: 100px;
+            letter-spacing: 0.1em;
+        }
+
+        .cv-download-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 20px rgba(255, 59, 48, 0.2);
+        }
+
+        /* 6. MAGNETIC BUTTON (Removed) */
+        /* CSS removed */
+
+        /* 6.5 TESTIMONIALS (NEW) */
+        .testimonial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .testimonial-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 20px;
+            transition: transform 0.3s, background 0.3s;
+        }
+
+        .testimonial-card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent);
+        }
+
+        .quote-icon {
+            font-size: 2rem;
+            color: var(--accent);
+            margin-bottom: 20px;
+            font-family: var(--font-display);
+        }
+
+        .client-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .client-info h4 {
+            font-size: 1rem;
+            margin-bottom: 5px;
+        }
+
+        .client-info p {
+            font-size: 0.8rem;
+            opacity: 0.5;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* 7. CONTACT FORM (NEW) */
+        #contact-form-section {
+            padding: 150px 20px;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+            position: relative;
+        }
+
+        .form-container {
+            max-width: 800px;
+            margin: 0 auto;
             display: grid;
             grid-template-columns: 1fr;
-            gap: 2rem;
+            gap: 40px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-field {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            padding: 15px 0;
+            color: var(--text);
+            font-size: 1.2rem;
+            font-family: var(--font-body);
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-field:focus {
+            border-bottom-color: var(--accent);
+        }
+
+        .input-label {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            color: var(--text);
+            opacity: 0.5;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 0.9rem;
+            pointer-events: none;
+            transition: 0.3s ease;
+        }
+
+        .input-field:focus~.input-label,
+        .input-field:valid~.input-label {
+            top: -10px;
+            font-size: 0.7rem;
+            opacity: 1;
+            color: var(--accent);
+        }
+
+        .submit-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 20px 60px;
+            font-family: var(--font-display);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 100px;
+            margin-top: 30px;
+            transition: 0.3s;
             width: 100%;
         }
 
-        .cta-btn {
-            background: var(--primary);
-            color: #000;
-            padding: 1rem 3rem;
-            border-radius: 50px;
-            font-size: 1.5rem;
-            font-weight: bold;
+        .submit-btn:hover {
+            background: var(--text);
+            color: var(--bg);
+        }
+
+        /* 8. FOOTER (REDESIGNED) */
+        .footer-premium {
+            background: #000;
+            color: #fff;
+            padding: 100px 60px 40px;
+            border-top: 1px solid #333;
+            font-family: var(--font-body);
+        }
+
+        .footer-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 50px;
+            margin-bottom: 80px;
+        }
+
+        .footer-brand h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            font-family: var(--font-display);
+        }
+
+        .footer-brand p {
+            opacity: 0.5;
+            max-width: 300px;
+            line-height: 1.6;
+        }
+
+        .footer-links-group {
+            display: flex;
+            gap: 80px;
+            flex-wrap: wrap;
+        }
+
+        .link-col h4 {
+            font-size: 0.9rem;
+            opacity: 0.4;
+            text-transform: uppercase;
+            margin-bottom: 30px;
+            letter-spacing: 0.15em;
+        }
+
+        .link-col ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .link-col li {
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .footer-link {
+            display: inline-block;
+            color: #fff;
             text-decoration: none;
-            opacity: 0;
-            transform: scale(0.5);
-            transition: transform 0.3s ease;
+            font-size: 1.1rem;
+            transition: color 0.3s;
+            position: relative;
         }
 
-        .cta-btn:hover {
-            transform: scale(1.1) !important;
-        }
-
-        .floating-orb {
+        .footer-link::before {
+            content: attr(data-text);
             position: absolute;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, var(--primary), transparent 70%);
-            border-radius: 50%;
-            opacity: 0.2;
+            top: 100%;
+            left: 0;
+            color: var(--accent);
+        }
+
+        .footer-link:hover {
+            transform: translateY(-100%);
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #222;
+            padding-top: 40px;
+            opacity: 0.4;
+            font-size: 0.9rem;
+        }
+
+        .social-links a {
+            margin-left: 20px;
+            transition: color 0.3s;
+        }
+
+        .social-links a:hover {
+            color: var(--accent);
+        }
+
+        /* UTILS */
+        .nav-link {
+            position: relative;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0%;
+            height: 1px;
+            background: var(--text);
+            transition: width 0.3s;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        .liquid-btn {
+            position: relative;
+            padding: 1.2rem 3.5rem;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            color: var(--text);
+            font-weight: bold;
+            font-family: var(--font-display);
+            letter-spacing: 0.1em;
+            overflow: hidden;
+            transition: border-color 0.3s;
+            z-index: 1;
+            display: inline-block;
+        }
+
+        .liquid-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--accent);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
             z-index: -1;
         }
 
-        /* --- GLOBAL INTERACTIVE STYLES --- */
-        button,
-        .interactive-btn,
-        .cta-btn {
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .liquid-btn:hover::before {
+            transform: scaleX(1);
+            transform-origin: left;
         }
 
-        button:hover,
-        .interactive-btn:hover {
-            transform: scale(1.1) translateY(-2px);
-            box-shadow: 0 0 15px var(--primary);
-            background: #fff !important;
-            color: #000 !important;
+        .liquid-btn:hover {
+            border-color: var(--accent);
+            color: #fff;
         }
 
-        .card:hover {
-            border-color: var(--primary);
-            transform: scale(1.02);
+        .liquid-btn span {
+            display: inline-block;
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
         }
+
+        .liquid-btn:hover span {
+            transform: translateY(-3px);
+        }
+
+        .theme-toggle {
+            position: relative;
+            width: 64px;
+            height: 32px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 2px;
+            overflow: hidden;
+        }
+
+        .theme-knob {
+            width: 26px;
+            height: 26px;
+            background: var(--text);
+            border-radius: 50%;
+            position: absolute;
+            left: 3px;
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+        }
+
+        .theme-knob i {
+            font-size: 12px;
+            color: var(--bg);
+        }
+
+        [data-theme="light"] .theme-knob {
+            transform: translateX(32px);
+        }
+
+        .shutter {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: var(--text);
+            z-index: 10000;
+            transform: scaleY(0);
+            transform-origin: bottom;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--bg);
+            pointer-events: none;
+        }
+
+        .theme-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 9997;
+            pointer-events: none;
+            background: transparent;
+            clip-path: circle(0% at 50% 50%);
+        }
+
+        /* ARSENAL */
+        .arsenal-section {
+            height: 70vh;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            gap: 2vw;
+            padding-top: 10vh;
+            background: var(--bg);
+        }
+
+        .col-wrapper {
+            width: 25vw;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+        }
+
+        .col-inner {
+            display: flex;
+            flex-direction: column;
+            gap: 4vh;
+            will-change: transform;
+        }
+
+        .arsenal-item {
+            font-size: 3vw;
+            line-height: 1;
+            color: transparent;
+            -webkit-text-stroke: 1px var(--text);
+            opacity: 0.3;
+            transition: opacity 0.3s, color 0.3s, letter-spacing 0.3s;
+            text-align: center;
+            padding: 2vh 0;
+            cursor: default;
+        }
+
+        .arsenal-item:hover {
+            opacity: 1;
+            color: var(--text);
+            letter-spacing: 0.1em;
+        }
+
+        /* PROJECTS */
+        .slider-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #333;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 5vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            will-change: transform;
+        }
+
+        .slide-title {
+            position: absolute;
+            top: 5vw;
+            left: 5vw;
+            font-size: 7vw;
+            font-weight: 600;
+            line-height: 1;
+            font-family: var(--font-display);
+        }
+
+        .slide-number {
+            position: absolute;
+            top: 50%;
+            left: 5vw;
+            transform: translateY(-50%);
+            font-size: 7vw;
+            font-weight: 500;
+            font-family: var(--font-display);
+        }
+
+        .slide-preview {
+            position: absolute;
+            bottom: 10vh;
+            right: 5vw;
+            width: 40vw;
+            height: 28vw;
+            background-color: #f0f0f0;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        .slide-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.7s;
+        }
+
+        .slide:hover .slide-preview img {
+            transform: scale(1.1);
+        }
+
+        .slide-1 {
+            background-color: #E8E8E3;
+            color: #000;
+        }
+
+        .slide-1 .slide-number {
+            color: rgba(0, 0, 0, 0.1);
+        }
+
+        .slide-2 {
+            background-color: #000;
+            color: #fff;
+        }
+
+        .slide-2 .slide-number {
+            color: rgba(255, 255, 255, 0.1);
+        }
+
+        .slide-3 {
+            background-color: #FF3B30;
+            color: #fff;
+        }
+
+        .slide-3 .slide-number {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .slide-4 {
+            background-color: #fff;
+            color: #000;
+        }
+
+        .slide-4 .slide-number {
+            color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* FOOTER REVEAL SETUP */
+        #contact-footer-container {
+            position: relative;
+            z-index: 10;
+            background: #000;
+        }
+
+        .main-content {
+            position: relative;
+            z-index: 20;
+            background: var(--bg);
+            box-shadow: 0 50px 100px rgba(0, 0, 0, 0.5);
+            border-bottom-left-radius: 3rem;
+            border-bottom-right-radius: 3rem;
+            transition: background-color 0.5s ease;
+        }
+
+        .hero-text .char {
+            transition: color 0.3s;
+        }
+
+        .hero-text:hover .char {
+            color: var(--accent);
+            transition-delay: calc(var(--char-index) * 0.05s);
+        }
+
+        .split-animate .word {
+            opacity: 0.1;
+            transition: opacity 0.5s;
+            filter: blur(5px);
+        }
+
+        .split-animate .word.active {
+            opacity: 1;
+            filter: blur(0px);
+        }
+
+        .clip-text {
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+        }
+    </style>
     </style>
 </head>
 
-<body>
+<body class="antialiased">
 
-    <section id="hero" style="min-height: 100vh;">
-        <div class="floating-orb" style="top: -20%; right: -10%; width: 600px; height: 600px; filter: blur(100px); background: radial-gradient(circle, var(--primary), transparent 60%);"></div>
-        <div class="floating-orb" style="bottom: -20%; left: -20%; width: 500px; height: 500px; filter: blur(80px); background: radial-gradient(circle, #00ccff, transparent 60%);"></div>
-        
-        <div style="z-index: 2; text-align: center;">
-            <div style="display: inline-block; padding: 0.5rem 1.5rem; background: rgba(255,255,255,0.1); border-radius: 50px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
-                <span style="color: var(--primary); font-weight: bold;">NEW</span> Launch v2.0 Available
-            </div>
-            
-            <h1 class="hero-title" style="font-size: 5.5rem; letter-spacing: -2px; line-height: 1.1;">
-                Future of <br>
-                <span style="color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.5);">Digital</span> Presence
-            </h1>
-            
-            <p class="hero-text" style="font-size: 1.8rem; color: #aaa; margin-top: 2rem;">
-                Don't just build a website. <br> Engineer a digital experience.
-            </p>
+    <div id="cursor"></div>
+    <div id="cursor-follower"></div>
+    <div class="shutter">
+        <h2 class="text-6xl font-bold" style="font-family: var(--font-display);">Loading...</h2>
+    </div>
+    <div class="theme-overlay"></div>
 
-            <!-- 3D Mockup Container -->
-            <div id="hero-canvas-container" style="margin-top: 4rem; opacity: 0; transform: scale(0.8);">
-                 <!-- We will use a CSS Grid of Cards instead of just a canvas for 'modern' look -->
-                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; width: 100%; max-width: 800px; margin: 0 auto;">
-                     <div class="mockup-card" style="background: #111; padding: 2rem; border-radius: 12px; border: 1px solid #333;">
-                         <div style="width: 40px; height: 40px; background: var(--primary); border-radius: 8px; margin-bottom: 1rem;"></div>
-                         <div style="height: 10px; width: 60%; background: #333; border-radius: 4px;"></div>
-                     </div>
-                      <div class="mockup-card" style="background: #161616; padding: 2rem; border-radius: 12px; border: 1px solid #333; transform: translateY(-20px);">
-                         <div style="width: 40px; height: 40px; background: #00ccff; border-radius: 8px; margin-bottom: 1rem;"></div>
-                         <div style="height: 10px; width: 80%; background: #333; border-radius: 4px;"></div>
-                         <div style="height: 10px; width: 40%; background: #333; border-radius: 4px; margin-top: 10px;"></div>
-                     </div>
-                      <div class="mockup-card" style="background: #111; padding: 2rem; border-radius: 12px; border: 1px solid #333;">
-                         <div style="width: 40px; height: 40px; background: #ffbd2e; border-radius: 8px; margin-bottom: 1rem;"></div>
-                         <div style="height: 10px; width: 50%; background: #333; border-radius: 4px;"></div>
-                     </div>
-                 </div>
+    <nav class="fixed top-0 w-full px-10 py-8 flex justify-between items-center z-50" style="color: var(--text);">
+        <a href="#hero" class="text-2xl font-bold tracking-widest hover-trigger"
+            style="font-family: var(--font-display);">Hardik.</a>
+        <div class="hidden md:flex items-center gap-12 text-sm font-bold tracking-[0.2em]">
+            <a href="#about" class="nav-link nav-transition-btn">About</a>
+            <a href="#process" class="nav-link nav-transition-btn">Process</a>
+            <a href="projects.html" class="nav-link nav-transition-btn">Work</a>
+            <a href="#closer" class="nav-link nav-transition-btn">Contact</a>
+            <div class="theme-toggle hover-trigger" id="theme-btn">
+                <div class="theme-knob"><i class="fa-solid fa-moon"></i></div>
             </div>
         </div>
-    </section>
+    </nav>
 
-    <!-- TRUSTED BY MARQUEE -->
-    <div style="width: 100%; background: #000; padding: 2rem 0; overflow: hidden; white-space: nowrap; border-top: 1px solid #222; border-bottom: 1px solid #222;">
-        <div style="display: inline-block; animation: marquee 20s linear infinite;">
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">GOOGLE</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">NETFLIX</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">SPOTIFY</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">STRIPE</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">AIRBNB</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">MICROSOFT</span>
-             <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">GOOGLE</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">NETFLIX</span>
-            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">SPOTIFY</span>
-        </div>
-        <style> @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } </style>
+    <div class="main-content">
+
+        <section id="hero" class="h-screen w-full flex flex-col justify-center items-center relative overflow-hidden">
+            <div class="availability-badge">
+                <div class="status-dot"></div>
+                <span>Accepting Limited Projects</span>
+            </div>
+
+            <div class="text-center z-10 relative">
+                <div class="clip-text">
+                    <h1 class="hero-text hero-line-1 text-[13vw] leading-[0.85] font-bold hover-trigger">Creative</h1>
+                </div>
+                <div class="clip-text">
+                    <h1 class="hero-text hero-line-2 text-[13vw] leading-[0.85] font-bold hover-trigger"
+                        style="opacity: 0.5;">Developer</h1>
+                </div>
+            </div>
+
+            <div class="mt-16 opacity-0 hero-fade">
+                <a href="projects.html" class="liquid-btn hover-trigger nav-transition-btn">
+                    <span>View All Work</span>
+                </a>
+            </div>
+        </section>
+
+        <section id="about" class="h-screen flex flex-col justify-center items-center px-6 md:px-20 max-w-7xl mx-auto">
+            <div class="text-center">
+                <p class="text-sm uppercase tracking-widest opacity-50 mb-10 font-bold"
+                    style="font-family: var(--font-display);">Who am I?</p>
+                <h2 class="split-animate text-4xl md:text-6xl leading-[1.2]"
+                    style="font-family: var(--font-body); font-weight: 300;">
+                    I help brands define their digital identity through
+                    <span class="font-bold" style="color: var(--accent)">motion</span>,
+                    <span class="font-bold" style="color: var(--accent)">interaction</span>, and
+                    <span class="font-bold" style="color: var(--accent)">visual storytelling</span>.
+                    We don't just write code; we compose experiences.
+                </h2>
+            </div>
+        </section>
+
+        <section id="process">
+            <div class="process-svg-container">
+                <div class="process-line-fill"></div>
+            </div>
+            <div class="container mx-auto px-6">
+                <div class="process-step hover-trigger">
+                    <div class="step-dot"></div>
+                    <div class="step-num">01</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Discovery</h3>
+                        <p class="step-desc">Uncovering the core values to tell a story that resonates.</p>
+                    </div>
+                </div>
+                <div class="process-step hover-trigger">
+                    <div class="step-dot"></div>
+                    <div class="step-num">02</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Strategy</h3>
+                        <p class="step-desc">Defining the roadmap. We analyze the landscape to position your brand
+                            effectively.</p>
+                    </div>
+                </div>
+                <div class="process-step hover-trigger">
+                    <div class="step-dot"></div>
+                    <div class="step-num">03</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Craft</h3>
+                        <p class="step-desc">Pixel-perfect design merged with fluid animations.</p>
+                    </div>
+                </div>
+                <div class="process-step hover-trigger">
+                    <div class="step-dot"></div>
+                    <div class="step-num">04</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Development</h3>
+                        <p class="step-desc">Translating design into robust code. Modern frameworks for silky smooth
+                            performance.</p>
+                    </div>
+                </div>
+                <div class="process-step hover-trigger">
+                    <div class="step-dot"></div>
+                    <div class="step-num">05</div>
+                    <div class="step-content">
+                        <h3 class="step-title">Launch</h3>
+                        <p class="step-desc">Robust code that scales for a future-proof presence.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tech" class="arsenal-section">
+            <div class="absolute top-10 left-10 opacity-50 uppercase text-sm font-bold tracking-widest">The Arsenal
+            </div>
+            <div class="col-wrapper" id="col-1">
+                <div class="col-inner"></div>
+            </div>
+            <div class="col-wrapper" id="col-2">
+                <div class="col-inner"></div>
+            </div>
+            <div class="col-wrapper" id="col-3">
+                <div class="col-inner"></div>
+            </div>
+        </section>
+
+        <section id="projects" class="slider-container">
+            <div class="slide slide-1">
+                <div class="logo absolute top-5 right-5 font-bold text-2xl">01.</div>
+                <div class="slide-title">Neon Nexus</div>
+                <div class="slide-number">(01)</div>
+                <div class="slide-preview hover-trigger"><img
+                        src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000"></div>
+            </div>
+            <div class="slide slide-2">
+                <div class="logo absolute top-5 right-5 font-bold text-2xl">02.</div>
+                <div class="slide-title">Zenith Arch</div>
+                <div class="slide-number">(02)</div>
+                <div class="slide-preview hover-trigger"><img
+                        src="https://images.unsplash.com/photo-1600607686527-6fb886090705?q=80&w=1000"></div>
+            </div>
+            <div class="slide slide-3">
+                <div class="logo absolute top-5 right-5 font-bold text-2xl">03.</div>
+                <div class="slide-title">Hyper Kicks</div>
+                <div class="slide-number">(03)</div>
+                <div class="slide-preview hover-trigger"><img
+                        src="https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=1000"></div>
+            </div>
+            <a href="projects.html" class="slide slide-4 nav-transition-btn block text-center"
+                style="text-decoration: none;">
+                <div class="logo absolute top-5 right-5 font-bold text-2xl">04.</div>
+                <div class="slide-title">View All</div>
+                <div class="slide-number">(04)</div>
+                <div class="slide-preview hover-trigger"
+                    style="background: #111; display: flex; justify-content: center; align-items: center;">
+                    <i class="fa-solid fa-arrow-right text-white text-6xl"></i>
+                </div>
+            </a>
+        </section>
+
+        <section id="authority" class="py-32 px-6 md:px-20 relative">
+            <h2 class="section-title text-4xl mb-16 text-center">Experience Data</h2>
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-box hover-trigger">
+                    <div class="stat-number" data-target="3">0</div>
+                    <div class="stat-label">Years Experience</div>
+                </div>
+                <div class="stat-box hover-trigger">
+                    <div class="stat-number" data-target="25">0</div>
+                    <div class="stat-label">Projects Shipped</div>
+                </div>
+                <div class="stat-box hover-trigger">
+                    <div class="stat-number" data-target="10">0</div>
+                    <div class="stat-label">Happy Clients</div>
+                </div>
+                <div class="stat-box hover-trigger">
+                    <div class="stat-number" data-target="100">0</div>
+                    <div class="stat-label">Job Success</div>
+                </div>
+            </div>
+            <div class="text-center">
+                <button class="cv-download-btn hover-trigger" onclick="alert('Downloading CV...')">DOWNLOAD FULL
+                    RESUME</button>
+            </div>
+        </section>
+
+        <section id="contact-form-section" class="px-6 md:px-20">
+            <div class="text-center mb-16">
+                <h2 class="section-title text-5xl">Let's Talk</h2>
+                <p class="mt-4 opacity-50">Have an idea? Let's build it together.</p>
+            </div>
+            <div class="form-container">
+                <form onsubmit="event.preventDefault(); alert('Message Sent!');" class="glass-form">
+                    <div class="form-row">
+                        <div class="input-group">
+                            <input type="text" class="input-field hover-trigger" required>
+                            <label class="input-label">Your Name</label>
+                        </div>
+                        <div class="input-group">
+                            <input type="email" class="input-field hover-trigger" required>
+                            <label class="input-label">Your Email</label>
+                        </div>
+                    </div>
+                    <div class="input-group mt-10">
+                        <input type="text" class="input-field hover-trigger" required>
+                        <label class="input-label">Project Type (Web, Mobile, Design)</label>
+                    </div>
+                    <div class="input-group mt-10">
+                        <input type="text" class="input-field hover-trigger" required>
+                        <label class="input-label">Tell me about your project</label>
+                    </div>
+                    <button type="submit" class="submit-btn hover-trigger">Send Message</button>
+                </form>
+            </div>
+        </section>
+
+        <section id="testimonials" class="py-32 px-6 md:px-20 relative border-t border-[var(--border)]">
+            <h2 class="section-title text-4xl mb-20 text-center">Client Stories</h2>
+            <div class="testimonial-grid">
+                <div class="testimonial-card hover-trigger">
+                    <div class="quote-icon">“</div>
+                    <p class="client-text">Hardik didn't just build a website; he crafted an experience. The attention
+                        to detail and animations are world-class.</p>
+                    <div class="client-info">
+                        <h4>Sarah Jenkins</h4>
+                        <p>CEO, Lumina Tech</p>
+                    </div>
+                </div>
+                <div class="testimonial-card hover-trigger">
+                    <div class="quote-icon">“</div>
+                    <p class="client-text">A true creative partner. He understood our vision immediately and elevated it
+                        beyond our expectations.</p>
+                    <div class="client-info">
+                        <h4>David Chen</h4>
+                        <p>Founder, Apex Studios</p>
+                    </div>
+                </div>
+                <div class="testimonial-card hover-trigger">
+                    <div class="quote-icon">“</div>
+                    <p class="client-text">Technical expertise meets artistic vision. The final product is fast,
+                        beautiful, and converts like crazy.</p>
+                    <div class="client-info">
+                        <h4>Elena Rodriguez</h4>
+                        <p>Director, ArtFlow</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div style="height: 100px; background: var(--bg);"></div>
+
     </div>
 
-    <section id="features" style="padding: 6rem 2rem;">
-        <h1 class="feature-title" style="font-size: 3rem; margin-bottom: 4rem;">Engineered for <span style="color: var(--primary)">Growth</span></h1>
-        
-        <div class="feature-grid">
-            <div class="card feature-card interactive" style="border-left: 4px solid var(--primary);">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">⚡</div>
-                <h3>Lightning Fast</h3>
-                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">99/100 Google PageSpeed scores guaranteed. We optimize every byte.</p>
+    <div id="contact-footer-container">
+        <footer class="footer-premium">
+            <div class="footer-top">
+                <div class="footer-brand">
+                    <h2>Hardik.</h2>
+                    <p>Crafting digital experiences that merge art, code, and interaction.</p>
+                </div>
+                <div class="footer-links-group">
+                    <div class="link-col">
+                        <h4>Sitemap</h4>
+                        <ul>
+                            <li><a href="#hero" class="footer-link hover-trigger" data-text="Home">Home</a></li>
+                            <li><a href="#about" class="footer-link hover-trigger" data-text="About">About</a></li>
+                            <li><a href="#projects" class="footer-link hover-trigger" data-text="Work">Work</a></li>
+                        </ul>
+                    </div>
+                    <div class="link-col">
+                        <h4>Socials</h4>
+                        <ul>
+                            <li><a href="#" class="footer-link hover-trigger" data-text="LinkedIn">LinkedIn</a></li>
+                            <li><a href="#" class="footer-link hover-trigger" data-text="Instagram">Instagram</a></li>
+                            <li><a href="#" class="footer-link hover-trigger" data-text="GitHub">GitHub</a></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
-            
-            <div class="card feature-card interactive" style="border-left: 4px solid #00ccff;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
-                <h3>AI Powered</h3>
-                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">Integrated with GPT-4 for dynamic content and automated customer support.</p>
+            <div class="footer-bottom">
+                <div>&copy; 2024 Hardik. All Rights Reserved.</div>
+                <div class="social-links">
+                    <a href="#" class="hover-trigger"><i class="fa-brands fa-twitter"></i></a>
+                    <a href="#" class="hover-trigger"><i class="fa-brands fa-dribbble"></i></a>
+                </div>
             </div>
-            
-            <div class="card feature-card interactive" style="border-left: 4px solid #ffbd2e;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🎨</div>
-                <h3>Award Winning</h3>
-                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">Designs that win Awwwards. Stand out from the generic templates.</p>
-            </div>
-        </div>
-    </section>
+        </footer>
+    </div>
 
-    <!-- STATS SECTION -->
-    <section id="stats" style="min-height: 50vh; background: #0f0f0f; width: 100%;">
-        <div style="display: flex; gap: 4rem; text-align: center;">
-            <div class="stat-item">
-                <h2 style="font-size: 4rem; color: #fff;">150+</h2>
-                <p style="color: #666; font-size: 1.2rem;">Projects Launched</p>
-            </div>
-             <div class="stat-item">
-                <h2 style="font-size: 4rem; color: var(--primary);">98%</h2>
-                <p style="color: #666; font-size: 1.2rem;">Client Satisfaction</p>
-            </div>
-             <div class="stat-item">
-                <h2 style="font-size: 4rem; color: #00ccff;">10x</h2>
-                <p style="color: #666; font-size: 1.2rem;">ROI Average</p>
-            </div>
-        </div>
-    </section>
-
-    <section id="cta">
-        <div class="floating-orb" style="bottom: 10%; left: -10%;"></div>
-        <h1 class="cta-title">Ready to Launch?</h1>
-        <p class="cta-text">Don't settle for average. Get a website that sells itself.</p>
-        <a href="#" class="cta-btn interactive">Start Now</a>
-        <p style="margin-top: 2rem; font-size: 1rem; opacity: 0.8;">haikkashiyani.kesug.com</p>
-    </section>
+    <script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollToPlugin.min.js"></script>
+    <script src="https://unpkg.com/split-type"></script>
 
     <script>
-        gsap.registerPlugin(ScrollTrigger);
+        document.addEventListener("DOMContentLoaded", (event) => {
+            gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-        // --- 3D Canvas Mockup (Rotating Cube Effect) ---
-        const canvas = document.getElementById('hero-canvas');
-        const ctx = canvas.getContext('2d');
-        let rotation = 0;
+            // 1. THEME TOGGLE
+            const themeBtn = document.getElementById('theme-btn');
+            const themeKnobIcon = document.querySelector('.theme-knob i');
+            const overlay = document.querySelector('.theme-overlay');
+            const html = document.documentElement;
+            themeBtn.addEventListener('click', (e) => {
+                const isDark = html.getAttribute('data-theme') === 'dark';
+                const newTheme = isDark ? 'light' : 'dark';
+                const nextBg = isDark ? '#E0E0E0' : '#050505';
+                const rect = themeBtn.getBoundingClientRect();
+                overlay.style.backgroundColor = nextBg; overlay.style.zIndex = 9997;
+                gsap.fromTo(overlay, { clipPath: `circle(0% at ${rect.left + 32}px ${rect.top + 16}px)` }, { clipPath: `circle(150% at ${rect.left + 32}px ${rect.top + 16}px)`, duration: 1.2, ease: "power4.inOut", onComplete: () => { html.setAttribute('data-theme', newTheme); themeKnobIcon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon'; gsap.set(overlay, { clipPath: `circle(0% at 0 0)` }); } });
+            });
 
-        function drawCube() {
-            ctx.clearRect(0, 0, 300, 300);
-            ctx.strokeStyle = '#00ff88';
-            ctx.lineWidth = 2;
-            ctx.save();
-            ctx.translate(150, 150);
-            ctx.rotate(rotation);
-            ctx.strokeRect(-50, -50, 100, 100);
-            ctx.restore();
-            rotation += 0.01;
-            requestAnimationFrame(drawCube);
-        }
-        drawCube();
+            // 2. NAV TRANSITION
+            const navLinks = document.querySelectorAll('.nav-transition-btn');
+            const shutter = document.querySelector('.shutter');
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    if (link.getAttribute('href').startsWith('#')) {
+                        e.preventDefault();
+                        const target = link.getAttribute('href');
+                        const tl = gsap.timeline();
+                        tl.to(shutter, { scaleY: 1, duration: 0.8, ease: "power4.inOut" }).add(() => lenis.scrollTo(target, { immediate: true })).to(shutter, { scaleY: 0, transformOrigin: "top", duration: 0.8, delay: 0.1, ease: "power4.inOut" });
+                    }
+                });
+            });
 
-        // Hero Animation
-        gsap.to(".hero-title", {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            ease: "power4.out"
-        });
+            // 3. SMOOTH SCROLL
+            const lenis = new Lenis({ duration: 1.5, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smoothWheel: true });
+            function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+            requestAnimationFrame(raf);
 
-        gsap.to(".hero-text", {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            delay: 0.3,
-            ease: "power4.out"
-        });
+            // 4. CURSOR
+            const cursor = document.getElementById('cursor');
+            const follower = document.getElementById('cursor-follower');
+            let mouseX = 0, mouseY = 0, posX = 0, posY = 0;
+            window.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; gsap.to(cursor, { x: mouseX, y: mouseY, duration: 0.1 }); });
+            gsap.ticker.add(() => { posX += (mouseX - posX) * 0.2; posY += (mouseY - posY) * 0.2; gsap.set(follower, { x: posX, y: posY }); });
+            document.querySelectorAll('.hover-trigger').forEach(el => { el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover')); el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover')); });
 
-        gsap.to("#hero-canvas", {
-            opacity: 1,
-            scale: 1,
-            duration: 1,
-            delay: 0.5,
-            startAt: { opacity: 0, scale: 0.5 },
-            ease: "elastic.out(1, 0.5)"
-        });
+            // 5. ARROW CURSOR
+            // 5. ARROW CURSOR (Removed Closer Section)
+            // const closerSection = document.querySelector('.arrow-cursor-zone');
+            // if(closerSection) {
+            //     closerSection.addEventListener('mouseenter', () => document.body.classList.add('cursor-arrow'));
+            //     closerSection.addEventListener('mouseleave', () => document.body.classList.remove('cursor-arrow'));
+            // }
 
-        // Features Animation
-        gsap.utils.toArray(".feature-card").forEach((card, i) => {
-            gsap.to(card, {
+            // 6. MAGNETIC BUTTON (Removed)
+            // const magBtn = document.querySelector('.magnetic-circle-btn');
+            // if(magBtn) { ... }
+
+            // 5. ARROW CURSOR (Removed Closer Section)
+            // const closerSection = document.querySelector('.arrow-cursor-zone');
+            // if(closerSection) {
+            //     closerSection.addEventListener('mouseenter', () => document.body.classList.add('cursor-arrow'));
+            //     closerSection.addEventListener('mouseleave', () => document.body.classList.remove('cursor-arrow'));
+            // }
+
+            // 6. MAGNETIC BUTTON (Removed)
+            // const magBtn = document.querySelector('.magnetic-circle-btn');
+            // if(magBtn) { ... }
+
+            // 7. HERO
+            const heroText = new SplitType('.hero-text', { types: 'chars' });
+            heroText.chars.forEach((char, i) => { char.style.setProperty('--char-index', i); });
+            const tl = gsap.timeline();
+            tl.from(heroText.chars, { y: "100%", duration: 1.5, ease: "power4.out", stagger: 0.05 }).to('.hero-fade', { opacity: 1, y: 0, duration: 1 }, "-=1");
+            gsap.to('.hero-line-1', { xPercent: -15, ease: "none", scrollTrigger: { trigger: "#hero", start: "top top", end: "bottom top", scrub: true } });
+            gsap.to('.hero-line-2', { xPercent: 15, ease: "none", scrollTrigger: { trigger: "#hero", start: "top top", end: "bottom top", scrub: true } });
+
+            // 8. ABOUT
+            const splitAnimate = new SplitType('.split-animate', { types: 'words' });
+            ScrollTrigger.create({ trigger: "#about", start: "top top", end: "+=150%", pin: true, scrub: 1, onUpdate: (self) => { const words = splitAnimate.words; const index = Math.floor(self.progress * words.length); words.forEach((word, i) => { if (i <= index) word.classList.add('active'); else word.classList.remove('active'); }); } });
+
+            // 9. PROCESS (LINE SCROLL)
+            gsap.to('.process-line-fill', {
+                scaleY: 1,
+                ease: "none",
                 scrollTrigger: {
-                    trigger: "#features",
+                    trigger: "#process",
                     start: "top center",
-                    toggleActions: "play none none reverse"
-                },
-                opacity: 1,
-                scale: 1,
-                duration: 0.8,
-                delay: i * 0.2,
-                ease: "back.out(1.7)"
+                    end: "bottom center",
+                    scrub: 0.1
+                }
             });
 
-            // Hover effect for recorder "Focus"
-            card.addEventListener('mouseenter', () => {
-                gsap.to(card, { scale: 1.05, borderColor: '#00ff88', duration: 0.3 });
-            });
-            card.addEventListener('mouseleave', () => {
-                gsap.to(card, { scale: 1, borderColor: 'rgba(255,255,255,0.1)', duration: 0.3 });
-            });
-        });
+            // 10. ARSENAL
+            const col1Data = ["React", "Three.js", "GSAP", "Canvas", "HTML5", "CSS3", "Redux", "Zustand"];
+            const col2Data = ["Next.js", "WebGL", "Node.js", "API", "Python", "Mongo", "SQL", "Docker"];
+            const col3Data = ["Figma", "Blender", "Spline", "UI/UX", "Motion", "Adobe", "Protopie", "Principle"];
+            const populateCol = (id, data, direction) => { const container = document.querySelector(`#${id} .col-inner`); const content = [...data, ...data, ...data, ...data]; content.forEach(item => { const div = document.createElement('div'); div.classList.add('arsenal-item', 'hover-trigger'); div.innerText = item; container.appendChild(div); div.addEventListener('mouseenter', () => gsap.to(container, { timeScale: 0, duration: 0.5 })); div.addEventListener('mouseleave', () => gsap.to(container, { timeScale: 1, duration: 0.5 })); }); let speed = direction === 'up' ? -1 : 1; let position = 0; const height = container.clientHeight / 4; gsap.ticker.add(() => { const velocity = lenis.velocity || 0; position += speed * (1 + Math.abs(velocity * 0.05)); if (direction === 'up') { if (position <= -height) position = 0; } else { if (position >= 0) position = -height; } gsap.set(container, { y: position }); }); };
+            populateCol('col-1', col1Data, 'up'); populateCol('col-2', col2Data, 'down'); populateCol('col-3', col3Data, 'up');
 
-        gsap.to(".feature-title", {
-            scrollTrigger: {
-                trigger: "#features",
-                start: "top 70%",
-            },
-            opacity: 1,
-            y: 0,
-            duration: 1
-        });
+            // 11. PROJECTS
+            const slides = gsap.utils.toArray(".slide"); const ACTIVE = { yPercent: 0, scale: 1, opacity: 1 }; const DROP = { yPercent: 5, scale: 0.9, opacity: 1 }; const BOTTOM = { yPercent: 100, scale: 1, opacity: 1 }; gsap.set(slides, BOTTOM); gsap.set(slides[0], ACTIVE);
+            ScrollTrigger.create({ trigger: ".slider-container", start: "top top", end: "+=" + (slides.length * 100) + "%", pin: true, scrub: 1, onUpdate: (self) => { const total = slides.length; const progress = self.progress; const idx = Math.floor(progress * (total - 1)); const subProg = (progress * (total - 1)) - idx; slides.forEach((slide, i) => { if (i === idx) { if (i < total - 1) gsap.to(slide, { yPercent: gsap.utils.interpolate(0, 5, subProg), scale: gsap.utils.interpolate(1, 0.9, subProg), duration: 0, overwrite: true }); else gsap.to(slide, { ...ACTIVE, duration: 0, overwrite: true }); slide.style.zIndex = i + 1; } else if (i === idx + 1) { gsap.to(slide, { yPercent: gsap.utils.interpolate(100, 0, subProg), duration: 0, overwrite: true }); slide.style.zIndex = i + 2; } else if (i < idx) { gsap.to(slide, { ...DROP, duration: 0, overwrite: true }); slide.style.zIndex = i; } else { gsap.to(slide, { ...BOTTOM, duration: 0, overwrite: true }); } }); } });
 
-        // CTA Animation
-        gsap.to(".cta-title", {
-            scrollTrigger: {
-                trigger: "#cta",
-                start: "top 60%",
-            },
-            opacity: 1,
-            y: 0,
-            duration: 1
-        });
+            // 12. SPOTLIGHT EFFECT & COUNTING
+            const statsGrid = document.getElementById('stats-grid');
+            if (statsGrid) {
+                const statBoxes = document.querySelectorAll('.stat-box');
+                statsGrid.addEventListener('mousemove', (e) => {
+                    statBoxes.forEach(box => {
+                        const rect = box.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        box.style.setProperty('--mouse-x', `${x}px`);
+                        box.style.setProperty('--mouse-y', `${y}px`);
+                    });
+                });
 
-        gsap.to(".cta-text", {
-            scrollTrigger: {
-                trigger: "#cta",
-                start: "top 60%",
-            },
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            delay: 0.2
-        });
-
-        gsap.to(".cta-btn", {
-            scrollTrigger: {
-                trigger: "#cta",
-                start: "top 60%",
-            },
-            opacity: 1,
-            scale: 1,
-            duration: 0.5,
-            delay: 0.5,
-            ease: "elastic.out(1, 0.3)"
-        });
-
-        // Floating Orbs
-        gsap.to(".floating-orb", {
-            y: 50,
-            duration: 2,
-            yoyo: true,
-            repeat: -1,
-            ease: "sine.inOut"
+                // Counting Animation
+                const statNumbers = document.querySelectorAll('.stat-number');
+                statNumbers.forEach(num => {
+                    const target = parseInt(num.getAttribute('data-target'));
+                    ScrollTrigger.create({
+                        trigger: num,
+                        start: "top 80%",
+                        once: true,
+                        onEnter: () => {
+                            gsap.to(num, {
+                                innerHTML: target,
+                                duration: 2,
+                                snap: { innerHTML: 1 },
+                                ease: "power2.out",
+                                onUpdate: function () {
+                                    num.innerHTML = Math.ceil(this.targets()[0].innerHTML) + "+";
+                                    if (target === 100) num.innerHTML = Math.ceil(this.targets()[0].innerHTML) + "%";
+                                }
+                            });
+                        }
+                    });
+                });
+            }
         });
     </script>
 </body>
