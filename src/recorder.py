@@ -364,94 +364,132 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
 
         start_time = time.time()
         
-        # Move mouse to center initially
-        virtual_h = int(CONTAINER_H / SCALE_FACTOR)
-        cx, cy = frame_to_viewport(VIRTUAL_W / 2, virtual_h / 2)
-        await page.mouse.move(cx, cy)
+        # --- VIRAL CHOREOGRAPHY ENGINE ---
         
-        while True:
-            # 1. Find Candidates inside FRAME
-            # We look for interactive elements
-            # Note: We query the FRAME, not the PAGE.
+        async def human_move(start_x, start_y, end_x, end_y, steps=60):
+            """Moves mouse in a human-like quadratic bezier curve."""
+            # Random control point deviation
+            offset = random.randint(-200, 200)
+            ctrl_x = (start_x + end_x) / 2 + offset
+            ctrl_y = (start_y + end_y) / 2 + (offset / 2)
             
+            for i in range(steps + 1):
+                t = i / steps
+                # Quadratic Bezier Formula
+                nt = 1 - t
+                x = (nt**2 * start_x) + (2 * nt * t * ctrl_x) + (t**2 * end_x)
+                y = (nt**2 * start_y) + (2 * nt * t * ctrl_y) + (t**2 * end_y)
+                
+                # Add tiny jitter
+                x += random.uniform(-2, 2)
+                y += random.uniform(-2, 2)
+                
+                await page.mouse.move(x, y)
+                # Variable sleep for acceleration/deceleration
+                # Fast in middle, slow at ends
+                await asyncio.sleep(0.005 + 0.01 * (4 * (t - 0.5)**2))
+
+        # Initial Center
+        current_x = 540 # Middle of 1080
+        current_y = 960 # Middle of 1920
+        await page.mouse.move(current_x, current_y)
+
+        while True:
+            # 1. Analyze Visible Elements (The "Eye")
+            # Priority: H1/H2 > Cards > Buttons > Images
             candidates = await content_frame.evaluate("""() => {
-                const els = Array.from(document.querySelectorAll('button, a, input, header, footer, nav, section, h1, h2, .card, .interactive'));
+                const els = Array.from(document.querySelectorAll('h1, h2, h3, .card, button, a.btn, img, section'));
                 return els.map(e => {
                     const r = e.getBoundingClientRect();
+                    // Basic scoring
+                    let score = 1;
+                    if (e.tagName.startsWith('H')) score = 3;
+                    if (e.classList.contains('card')) score = 2;
+                    if (e.tagName === 'BUTTON') score = 2;
+                    
                     return {
                         x: r.left + r.width/2,
                         y: r.top + r.height/2,
+                        width: r.width,
+                        height: r.height,
                         role: e.tagName,
-                        cls: Array.from(e.classList).join(' ')
+                        cls: Array.from(e.classList).join(' '),
+                        score: score
                     };
                 });
             }""")
             
-            # Filter candidates that are currently visible in the Iframe's Viewport
-            # The iframe window height is ~1250 / 2.3 = ~543px (Layout Height)
-            # Actually, "height: 100%" on iframe in HTML means it takes the height of the parent (1250).
-            # But scaled... CSS Transforms on Iframes are tricky.
-            # If parent is 1250px high, and iframe is scaled 2.3x...
-            # The logical height of the iframe document should be 1250 / 2.3 = 543px.
-            # So elements with Y > 543 are "below the fold".
+            frame_h = await content_frame.evaluate("window.innerHeight")
+            visible_targets = [c for c in candidates if 100 < c['y'] < frame_h - 100]
             
-            # Use `content_frame.evaluate('window.innerHeight')` to be sure.
-            frame_viewport_h = await content_frame.evaluate("window.innerHeight")
+            # Sort by "Viral Score" (Focus on content first)
+            visible_targets.sort(key=lambda x: x['score'], reverse=True)
             
-            visible_candidates = [c for c in candidates if 0 <= c['y'] <= frame_viewport_h]
+            # Action Decision
+            action_happened = False
             
-            should_interact = False
-            target = None
-            if visible_candidates and random.random() < 0.7:
-                target = random.choice(visible_candidates)
-                should_interact = True
+            if visible_targets and random.random() < 0.8:
+                # Pick a high-value target
+                # Introduce randomness but bias towards top scored
+                target = random.choice(visible_targets[:3]) 
                 
-            if should_interact and target:
                 # Convert to Viewport
                 vx, vy = frame_to_viewport(target['x'], target['y'])
                 
-                # Move
-                await page.mouse.move(vx, vy, steps=random.randint(15, 30))
-                
-                # Interaction
-                if target['role'] in ['BUTTON', 'A', 'INPUT'] or 'btn' in target['cls']:
-                    await page.mouse.down()
-                    await page.wait_for_timeout(random.randint(50, 100))
-                    await page.mouse.up()
-                else:
-                    await page.wait_for_timeout(random.randint(200, 500))
+                # Check bounds
+                if 0 <= vx <= 1080 and 0 <= vy <= 1920:
+                    # Move to it organically
+                    await human_move(current_x, current_y, vx, vy, steps=random.randint(40, 80))
+                    current_x, current_y = vx, vy
+                    
+                    # "The Presenter Point" (Wiggle)
+                    # Small circle/wiggle to indicate "Look at this"
+                    for _ in range(20):
+                        wx = vx + random.uniform(-10, 10)
+                        wy = vy + random.uniform(-10, 10)
+                        await page.mouse.move(wx, wy)
+                        await asyncio.sleep(0.01)
+                        
+                    # Hover effect wait
+                    await page.wait_for_timeout(random.randint(500, 1500))
+                    
+                    # Click if interaction
+                    if target['role'] == 'BUTTON' or 'btn' in target['cls'] or target['role'] == 'A':
+                        if random.random() < 0.5:
+                            await page.mouse.down()
+                            await page.wait_for_timeout(100)
+                            await page.mouse.up()
+                            await page.wait_for_timeout(1000)
+                    
+                    action_happened = True
+
+            if not action_happened:
+                 # Idle / Read
+                 await page.wait_for_timeout(random.randint(500, 1000))
+
+            # 2. SCROLLING (The "Feed" Rhythm)
+            # Scroll > Pause to Read > Scroll
             
-            # SCROLLING - BUTTER SMOOTH
-            # Instead of jumpy steps, use native smooth scrolling with calculated pauses.
-            
-            # 1. Check current progress
             scroll_info = await content_frame.evaluate("""() => {
-                return {
-                    current: window.scrollY,
-                    total: document.body.scrollHeight,
-                    view: window.innerHeight
-                };
+                 return { y: window.scrollY, total: document.body.scrollHeight, h: window.innerHeight };
             }""")
             
-            remaining_dist = scroll_info['total'] - (scroll_info['current'] + scroll_info['view'])
-            
-            if remaining_dist > 50:
-                # Smooth Scroll Logic
-                # We scroll a smaller chunk but smoother.
-                step = random.randint(250, 450) 
-                
-                # Execute Smooth Scroll
+            if scroll_info['y'] + scroll_info['h'] < scroll_info['total'] - 50:
+                # Scroll
+                step = random.randint(400, 700) # Big chunks like a swipe
                 await content_frame.evaluate(f"window.scrollBy({{top: {step}, left: 0, behavior: 'smooth'}})")
                 
-                # Wait for the smooth scroll to complete visually
-                # Browser smooth scroll takes time (approx 300-500ms).
-                await page.wait_for_timeout(random.randint(800, 1200)) # Pause to let user read content
-            else:
-                await page.wait_for_timeout(1000)
+                # Follow the scroll with mouse (physically move mouse up slightly as if dragging)
+                # await human_move(current_x, current_y, current_x, current_y - 100, steps=20)
+                # current_y -= 100
                 
+                # CRITICAL: Pause after scroll to let viewer digest content
+                await page.wait_for_timeout(random.randint(1500, 2500))
+            else:
+                 await page.wait_for_timeout(1000)
+
             # Time check
-            if time.time() - start_time > duration + 5:
-                # Force one last smooth scroll to bottom?
+            if time.time() - start_time > duration + 3:
                 break
                 
         # Save Video Logic - Correct Sequence
