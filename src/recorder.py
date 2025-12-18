@@ -499,28 +499,44 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
 
         # --- CHOREOGRAPHY ---
 
-        # 1. HERO PHASE (0-4s)
-        print("Phase 1: Hero")
-        await asyncio.sleep(3.0) 
-        # "Reading" Jitter - Mouse wanders while eyes read
-        for _ in range(20):
-            await page.mouse.move(current_x + random.uniform(-5,5), current_y + random.uniform(-5,5))
-            await asyncio.sleep(0.05)
+        # 1. HERO PHASE (0-5s) - "The Hook"
+        print("Phase 1: Hero & Interaction")
+        await asyncio.sleep(2.5) # Wait for initial load
+        
+        # SALESMAN MOVE: Highlight Scarcity ("Accepting Limited Projects")
+        print(">> Selling Scarcity")
+        badge_pos = await move_and_hover(".availability-badge")
+        # Draw a quick circle around it ("Look at this!")
+        cx, cy = current_x, current_y
+        for i in range(15):
+            import math
+            angle = i * 0.8
+            radius = 40
+            mx = cx + math.cos(angle) * radius * 1.5 # Ellipse
+            my = cy + math.sin(angle) * radius
+            await page.mouse.move(mx, my)
+            await asyncio.sleep(0.01)
             
-        # Hint at button
-        current_x, current_y = await move_and_hover(".liquid-btn")
         await asyncio.sleep(0.5)
 
-        # 2. ABOUT PHASE (4-8s)
-        print("Phase 2: About")
-        viewport_h = 1080 # Approx
-        await human_scroll_to(900) # Scroll to About
-        await asyncio.sleep(1.0)
+        # SALESMAN MOVE: Show functionality (Theme Toggle)
+        print(">> Selling Features (Theme)")
+        await move_and_hover("#theme-btn")
+        await asyncio.sleep(0.3)
+        await page.mouse.click(current_x, current_y)
+        await asyncio.sleep(1.5) # Let them see Light Mode
+        await page.mouse.click(current_x, current_y) # Switch back to Dark (Premium)
+        await asyncio.sleep(0.8)
+
+        # 2. ABOUT PHASE (5-8s) - smooth scroll via Nav
+        print("Phase 2: Navigation to About")
+        await move_and_hover("a[href='#about']")
+        await page.mouse.click(current_x, current_y)
+        await asyncio.sleep(1.5) # Wait for GSAP ScrollTo
         
-        # Trace text (Reading line)
+        # Read the headline text (Trace line)
         current_x, current_y = 200, 600
-        await human_move(current_x, current_y, 800, 600, steps=100, overshoot=False)
-        current_x, current_y = 800, 600
+        await human_move(current_x, current_y, 800, 600, steps=60, overshoot=False)
         
         # 3. PROCESS PHASE (8-14s)
         print("Phase 3: Process")
