@@ -71,20 +71,23 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         # 2. Container: "Presentation Window" - A clean, sharp, maximized container.
         # 3. Content: 100% Fit Iframe. No cutting.
         
-        # Dimensions for the "Virtual Browser"
-        # We want a modern mobile/tablet feel. 
-        # Width: 430px (iPhone Pro Max width) -> Scaled up to fill 1080p
-        # 1080px total. Margins 40px? -> 1000px targets.
-        # Scale: 1000 / 430 = 2.32
+        # --- VIRAL LAYOUT ENGINE (DESKTOP MODE) ---
+        # User Feedback: "Proper Website Display", "No Cutting".
+        # Solution: Switch from Mobile (430px) to Desktop (1024px).
+        # This provides a massive, professional viewport.
         
-        VIRTUAL_W = 430 
-        SCALE_FACTOR = 2.3
-        CONTAINER_W = int(VIRTUAL_W * SCALE_FACTOR) # ~989px
+        VIRTUAL_W = 1024 
         
-        # Height: fill available space between Header and Footer
-        # Header ~200px. Footer ~250px. Total 1920.
-        # Available ~1400px.
-        CONTAINER_H = 1350 
+        # Maximize the container height to fill the Short
+        # Header (~150) + Footer (~150) = 300. 1920 - 300 = 1620.
+        CONTAINER_H = 1550 
+        
+        # We need to fit 1024px into the 1080px video (with margins).
+        # Target Container Width: 1000px (40px margin total)
+        CONTAINER_W = 1000
+        
+        # Scale: Shrink slightly to fit
+        SCALE_FACTOR = CONTAINER_W / VIRTUAL_W # ~0.97
         
         # Header/Footer Text Defaults
         header_txt = overlay_header if overlay_header else "WEB DESIGN AWARDS"
@@ -100,7 +103,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 body {{
                     margin: 0; padding: 0;
                     width: 1080px; height: 1920px;
-                    /* VIBRANT Background - Distinctly NOT Black */
+                    /* VIBRANT Background */
                     background: linear-gradient(-45deg, #1a1a2e, #16213e, #4a1c40, #1a1a2e);
                     background-size: 400% 400%;
                     animation: gradientBG 15s ease infinite;
@@ -110,7 +113,8 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    justify-content: space-between;
+                    justify-content: space-between; /* Push Footer down */
+                    padding-bottom: 40px; /* Small bottom padding */
                 }}
                 
                 @keyframes gradientBG {{
@@ -121,30 +125,31 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 
                 /* --- HEADER SECTION --- */
                 #header-group {{
-                    margin-top: 80px;
+                    margin-top: 50px; /* Reduced top margin */
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     z-index: 10;
-                    height: 200px;
+                    height: 140px; /* Compact header */
+                    flex-shrink: 0;
                 }}
                 
                 #p-header {{
-                    font-size: 35px; font-weight: 700; letter-spacing: 4px;
+                    font-size: 30px; font-weight: 700; letter-spacing: 4px;
                     color: #888; text-transform: uppercase;
                 }}
                 
                 #p-title {{
-                    font-size: 60px; font-weight: 900;
+                    font-size: 50px; font-weight: 900;
                     text-align: center;
                     background: linear-gradient(135deg, #fff 0%, #aaa 100%);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
-                    margin-top: 15px;
+                    margin-top: 10px;
                     line-height: 1.1;
+                    max-width: 900px;
                 }}
                 
-                /* --- PRESENTATION WINDOW (The "Screen") --- */
                 /* --- PRESENTATION WINDOW (The "Screen") --- */
                 #presentation-window {{
                     position: relative;
@@ -154,18 +159,17 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     /* Premium "Pop" Styling */
                     background: #fff;
                     
-                    /* Deep, Multi-layered Shadow for Maximum Separation */
+                    /* Deep, Multi-layered Shadow */
                     box-shadow: 
-                        0 0 0 1px rgba(0,0,0, 0.8), /* Crisp black line */
-                        0 30px 80px rgba(0,0,0, 0.7), /* Deep Ambient */
-                        0 0 150px rgba(0,0,0, 0.9); /* Void Separation */
+                        0 0 0 1px rgba(0,0,0, 0.8), 
+                        0 30px 80px rgba(0,0,0, 0.7),
+                        0 0 150px rgba(0,0,0, 0.9);
                         
                     overflow: hidden; 
                     
-                    /* Subtle "High-End" Border Radius */
-                    border-radius: 16px; 
+                    /* Desktop Radius is usually sharper */
+                    border-radius: 12px; 
                     
-                    /* Glass-like Edge Definition */
                     border: 4px solid rgba(255, 255, 255, 0.1);
                     display: flex; flex-direction: column;
                 }}
