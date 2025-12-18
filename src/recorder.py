@@ -485,7 +485,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         # Hold on the 'clicked' state
         await asyncio.sleep(2.0)
         
-        break
+        # End of Script
                 
         # Save Video Logic - Correct Sequence
         video = page.video
