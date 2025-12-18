@@ -394,103 +394,98 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         current_y = 960 # Middle of 1920
         await page.mouse.move(current_x, current_y)
 
-        while True:
-            # 1. Analyze Visible Elements (The "Eye")
-            # Priority: H1/H2 > Cards > Buttons > Images
-            candidates = await content_frame.evaluate("""() => {
-                const els = Array.from(document.querySelectorAll('h1, h2, h3, .card, button, a.btn, img, section'));
-                return els.map(e => {
-                    const r = e.getBoundingClientRect();
-                    // Basic scoring
-                    let score = 1;
-                    if (e.tagName.startsWith('H')) score = 3;
-                    if (e.classList.contains('card')) score = 2;
-                    if (e.tagName === 'BUTTON') score = 2;
-                    
-                    return {
-                        x: r.left + r.width/2,
-                        y: r.top + r.height/2,
-                        width: r.width,
-                        height: r.height,
-                        role: e.tagName,
-                        cls: Array.from(e.classList).join(' '),
-                        score: score
-                    };
-                });
-            }""")
-            
-            frame_h = await content_frame.evaluate("window.innerHeight")
-            visible_targets = [c for c in candidates if 100 < c['y'] < frame_h - 100]
-            
-            # Sort by "Viral Score" (Focus on content first)
-            visible_targets.sort(key=lambda x: x['score'], reverse=True)
-            
-            # Action Decision
-            action_happened = False
-            
-            if visible_targets and random.random() < 0.8:
-                # Pick a high-value target
-                # Introduce randomness but bias towards top scored
-                target = random.choice(visible_targets[:3]) 
-                
-                # Convert to Viewport
-                vx, vy = frame_to_viewport(target['x'], target['y'])
-                
-                # Check bounds
-                if 0 <= vx <= 1080 and 0 <= vy <= 1920:
-                    # Move to it organically
-                    await human_move(current_x, current_y, vx, vy, steps=random.randint(40, 80))
-                    current_x, current_y = vx, vy
-                    
-                    # "The Presenter Point" (Wiggle)
-                    # Small circle/wiggle to indicate "Look at this"
-                    for _ in range(20):
-                        wx = vx + random.uniform(-10, 10)
-                        wy = vy + random.uniform(-10, 10)
-                        await page.mouse.move(wx, wy)
-                        await asyncio.sleep(0.01)
-                        
-                    # Hover effect wait
-                    await page.wait_for_timeout(random.randint(500, 1500))
-                    
-                    # Click if interaction
-                    if target['role'] == 'BUTTON' or 'btn' in target['cls'] or target['role'] == 'A':
-                        if random.random() < 0.5:
-                            await page.mouse.down()
-                            await page.wait_for_timeout(100)
-                            await page.mouse.up()
-                            await page.wait_for_timeout(1000)
-                    
-                    action_happened = True
+        # --- PROFESSIONAL PRESENTATION SCRIPT ---
+        # Instead of random wandering, we perform a scripted "Perfect Demo".
+        
+        async def move_and_hover(selector, hover_duration=1.0):
+             """Finds an element in the frame, moves to it smoothly, and hovers."""
+             try:
+                 box = await content_frame.evaluate(f"""(sel) => {{
+                     const el = document.querySelector(sel);
+                     if(!el) return null;
+                     const r = el.getBoundingClientRect();
+                     return {{ x: r.left + r.width/2, y: r.top + r.height/2 }};
+                 }}""", selector)
+                 
+                 if box:
+                     vx, vy = frame_to_viewport(box['x'], box['y'])
+                     await human_move(current_x, current_y, vx, vy, steps=50)
+                     return vx, vy # Update current pos
+             except Exception as e:
+                 print(f"Prop Move Failed: {e}")
+             return current_x, current_y
 
-            if not action_happened:
-                 # Idle / Read
-                 await page.wait_for_timeout(random.randint(500, 1000))
+        # 1. HERO PHASE (0-5s)
+        # Stay near center, let user read the Big Title
+        print("Phase 1: Hero")
+        await asyncio.sleep(2.0)
+        # Gentle float down
+        await human_move(current_x, current_y, current_x, current_y + 100, steps=100)
+        current_y += 100
+        await asyncio.sleep(1.5)
 
-            # 2. SCROLLING (The "Feed" Rhythm)
-            # Scroll > Pause to Read > Scroll
-            
-            scroll_info = await content_frame.evaluate("""() => {
-                 return { y: window.scrollY, total: document.body.scrollHeight, h: window.innerHeight };
-            }""")
-            
-            if scroll_info['y'] + scroll_info['h'] < scroll_info['total'] - 50:
-                # Scroll
-                step = random.randint(400, 700) # Big chunks like a swipe
-                await content_frame.evaluate(f"window.scrollBy({{top: {step}, left: 0, behavior: 'smooth'}})")
-                
-                # Follow the scroll with mouse (physically move mouse up slightly as if dragging)
-                # await human_move(current_x, current_y, current_x, current_y - 100, steps=20)
-                # current_y -= 100
-                
-                # CRITICAL: Pause after scroll to let viewer digest content
-                await page.wait_for_timeout(random.randint(1500, 2500))
-            else:
-                 await page.wait_for_timeout(1000)
+        # 2. SOCIAL PROOF (5-8s)
+        print("Phase 2: Social Proof")
+        # Scroll down to reveal Marquee (approx 800px)
+        await content_frame.evaluate("window.scrollTo({top: 600, behavior: 'smooth'})")
+        await asyncio.sleep(1.0) # Wait for scroll
+        # Move mouse to follow the marquee (left to right)
+        await human_move(current_x, current_y, 200, 1000, steps=40) # Left side
+        await human_move(200, 1000, 800, 1000, steps=120) # Slow pan right
+        current_x, current_y = 800, 1000
 
-            # Time check
-            if time.time() - start_time > duration + 3:
-                break
+        # 3. FEATURES PHASE (8-18s)
+        print("Phase 3: Features")
+        await content_frame.evaluate("window.scrollTo({top: 1400, behavior: 'smooth'})")
+        await asyncio.sleep(1.5)
+        
+        # Explicitly hover the 3 cards
+        # We need to know specific selectors or just use logic
+        # Let's target by class index if possible, or just generic locations
+        # Card 1 (Left/Top)
+        current_x, current_y = await move_and_hover(".feature-card:nth-child(1)")
+        await asyncio.sleep(1.5) # Let them read
+        
+        # Card 2 (Middle)
+        current_x, current_y = await move_and_hover(".feature-card:nth-child(2)")
+        await asyncio.sleep(1.5)
+        
+        # Card 3 (Right/Bottom)
+        current_x, current_y = await move_and_hover(".feature-card:nth-child(3)")
+        await asyncio.sleep(1.5)
+
+        # 4. STATS PHASE (18-24s)
+        print("Phase 4: Stats")
+        await content_frame.evaluate("window.scrollTo({top: 2200, behavior: 'smooth'})")
+        await asyncio.sleep(1.0)
+        
+        # Highlight the "98%"
+        current_x, current_y = await move_and_hover(".stat-item:nth-child(2) h2")
+        # Wiggle for emphasis
+        for _ in range(10):
+             await page.mouse.move(current_x + random.randint(-5,5), current_y + random.randint(-5,5))
+             await asyncio.sleep(0.05)
+        await asyncio.sleep(1.0)
+
+        # 5. CTA PHASE (24-30s)
+        print("Phase 5: CTA")
+        # Scroll to bottom
+        await content_frame.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})")
+        await asyncio.sleep(1.5)
+        
+        # Target the final button
+        current_x, current_y = await move_and_hover(".cta-btn")
+        await asyncio.sleep(0.5)
+        
+        # Click effect
+        await page.mouse.down()
+        await page.wait_for_timeout(150)
+        await page.mouse.up()
+        
+        # Hold on the 'clicked' state
+        await asyncio.sleep(2.0)
+        
+        break
                 
         # Save Video Logic - Correct Sequence
         video = page.video

@@ -128,44 +128,100 @@
 
 <body>
 
-    <section id="hero">
-        <div class="floating-orb" style="top: 10%; right: -10%;"></div>
-        <h1 class="hero-title">Future of Web</h1>
-        <p class="hero-text">Experience the next generation of digital presence. Fast. Fluid. Flawless.</p>
+    <section id="hero" style="min-height: 100vh;">
+        <div class="floating-orb" style="top: -20%; right: -10%; width: 600px; height: 600px; filter: blur(100px); background: radial-gradient(circle, var(--primary), transparent 60%);"></div>
+        <div class="floating-orb" style="bottom: -20%; left: -20%; width: 500px; height: 500px; filter: blur(80px); background: radial-gradient(circle, #00ccff, transparent 60%);"></div>
+        
+        <div style="z-index: 2; text-align: center;">
+            <div style="display: inline-block; padding: 0.5rem 1.5rem; background: rgba(255,255,255,0.1); border-radius: 50px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px);">
+                <span style="color: var(--primary); font-weight: bold;">NEW</span> Launch v2.0 Available
+            </div>
+            
+            <h1 class="hero-title" style="font-size: 5.5rem; letter-spacing: -2px; line-height: 1.1;">
+                Future of <br>
+                <span style="color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.5);">Digital</span> Presence
+            </h1>
+            
+            <p class="hero-text" style="font-size: 1.8rem; color: #aaa; margin-top: 2rem;">
+                Don't just build a website. <br> Engineer a digital experience.
+            </p>
 
-        <!-- Interactive 3D Mockup -->
-        <canvas id="hero-canvas" class="interactive" width="300" height="300"
-            style="background: rgba(255,255,255,0.05); border-radius: 20px; margin-bottom: 2rem; cursor: pointer;"></canvas>
+            <!-- 3D Mockup Container -->
+            <div id="hero-canvas-container" style="margin-top: 4rem; opacity: 0; transform: scale(0.8);">
+                 <!-- We will use a CSS Grid of Cards instead of just a canvas for 'modern' look -->
+                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; width: 100%; max-width: 800px; margin: 0 auto;">
+                     <div class="mockup-card" style="background: #111; padding: 2rem; border-radius: 12px; border: 1px solid #333;">
+                         <div style="width: 40px; height: 40px; background: var(--primary); border-radius: 8px; margin-bottom: 1rem;"></div>
+                         <div style="height: 10px; width: 60%; background: #333; border-radius: 4px;"></div>
+                     </div>
+                      <div class="mockup-card" style="background: #161616; padding: 2rem; border-radius: 12px; border: 1px solid #333; transform: translateY(-20px);">
+                         <div style="width: 40px; height: 40px; background: #00ccff; border-radius: 8px; margin-bottom: 1rem;"></div>
+                         <div style="height: 10px; width: 80%; background: #333; border-radius: 4px;"></div>
+                         <div style="height: 10px; width: 40%; background: #333; border-radius: 4px; margin-top: 10px;"></div>
+                     </div>
+                      <div class="mockup-card" style="background: #111; padding: 2rem; border-radius: 12px; border: 1px solid #333;">
+                         <div style="width: 40px; height: 40px; background: #ffbd2e; border-radius: 8px; margin-bottom: 1rem;"></div>
+                         <div style="height: 10px; width: 50%; background: #333; border-radius: 4px;"></div>
+                     </div>
+                 </div>
+            </div>
+        </div>
     </section>
 
-    <section id="features">
-        <h1 class="feature-title">Why Us?</h1>
+    <!-- TRUSTED BY MARQUEE -->
+    <div style="width: 100%; background: #000; padding: 2rem 0; overflow: hidden; white-space: nowrap; border-top: 1px solid #222; border-bottom: 1px solid #222;">
+        <div style="display: inline-block; animation: marquee 20s linear infinite;">
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">GOOGLE</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">NETFLIX</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">SPOTIFY</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">STRIPE</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">AIRBNB</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">MICROSOFT</span>
+             <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">GOOGLE</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">NETFLIX</span>
+            <span style="font-size: 2rem; font-weight: bold; color: #444; margin: 0 3rem;">SPOTIFY</span>
+        </div>
+        <style> @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } </style>
+    </div>
+
+    <section id="features" style="padding: 6rem 2rem;">
+        <h1 class="feature-title" style="font-size: 3rem; margin-bottom: 4rem;">Engineered for <span style="color: var(--primary)">Growth</span></h1>
+        
         <div class="feature-grid">
-            <div class="card feature-card interactive" style="cursor: pointer;">
+            <div class="card feature-card interactive" style="border-left: 4px solid var(--primary);">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">⚡</div>
                 <h3>Lightning Fast</h3>
-                <p style="font-size: 1rem; margin-top: 1rem;">Optimized for speed and performance.</p>
-                <button class="interactive-btn"
-                    style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); border:none; border-radius:5px; cursor:pointer;">Learn
-                    More</button>
+                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">99/100 Google PageSpeed scores guaranteed. We optimize every byte.</p>
             </div>
-            <div class="card feature-card interactive" style="cursor: pointer;">
+            
+            <div class="card feature-card interactive" style="border-left: 4px solid #00ccff;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
                 <h3>AI Powered</h3>
-                <p style="font-size: 1rem; margin-top: 1rem;">Built with intelligent automation.</p>
-                <button class="interactive-btn"
-                    style="margin-top:1rem; padding:0.5rem 1rem; background:var(--primary); border:none; border-radius:5px; cursor:pointer;">See
-                    AI</button>
+                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">Integrated with GPT-4 for dynamic content and automated customer support.</p>
             </div>
-            <div class="card feature-card interactive" style="cursor: pointer;">
-                <h3>Beautiful Design</h3>
-                <p style="font-size: 1rem; margin-top: 1rem;">Aesthetics that capture attention.</p>
-                <div class="color-swatches" style="display:flex; gap:10px; margin-top:1rem;">
-                    <span class="interactive"
-                        style="width:20px; height:20px; background:red; border-radius:50%;"></span>
-                    <span class="interactive"
-                        style="width:20px; height:20px; background:blue; border-radius:50%;"></span>
-                    <span class="interactive"
-                        style="width:20px; height:20px; background:green; border-radius:50%;"></span>
-                </div>
+            
+            <div class="card feature-card interactive" style="border-left: 4px solid #ffbd2e;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🎨</div>
+                <h3>Award Winning</h3>
+                <p style="font-size: 1.1rem; color: #888; margin-top: 1rem;">Designs that win Awwwards. Stand out from the generic templates.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- STATS SECTION -->
+    <section id="stats" style="min-height: 50vh; background: #0f0f0f; width: 100%;">
+        <div style="display: flex; gap: 4rem; text-align: center;">
+            <div class="stat-item">
+                <h2 style="font-size: 4rem; color: #fff;">150+</h2>
+                <p style="color: #666; font-size: 1.2rem;">Projects Launched</p>
+            </div>
+             <div class="stat-item">
+                <h2 style="font-size: 4rem; color: var(--primary);">98%</h2>
+                <p style="color: #666; font-size: 1.2rem;">Client Satisfaction</p>
+            </div>
+             <div class="stat-item">
+                <h2 style="font-size: 4rem; color: #00ccff;">10x</h2>
+                <p style="color: #666; font-size: 1.2rem;">ROI Average</p>
             </div>
         </div>
     </section>
