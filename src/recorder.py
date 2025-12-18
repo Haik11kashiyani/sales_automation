@@ -398,10 +398,89 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         current_y = 960 # Middle of 1920
         await page.mouse.move(current_x, current_y)
 
-        # --- PROFESSIONAL PRESENTATION SCRIPT (UPDATED FOR NEW PORTFOLIO) ---
+        # --- ULTRA-REALISTIC HUMAN ENGINE (GHOST CURSOR) ---
         
-        async def move_and_hover(selector, hover_duration=1.0):
-             """Finds an element in the frame, moves to it smoothly, and hovers."""
+        async def human_scroll_to(target_y, speed="normal"):
+            """
+            Simulates a human scrolling to a position using 'Flick & Glide' physics.
+            Instead of one jump, we do many small scrolls with momentum.
+            """
+            current_scroll = await content_frame.evaluate("window.scrollY")
+            distance = target_y - current_scroll
+            if abs(distance) < 50: return # Already there
+            
+            # Physics param
+            steps = 20 if speed == "fast" else 40
+            
+            # We use a curve: Slow start -> Fast Middle -> Slow End
+            for i in range(steps):
+                t = i / steps
+                # Ease In Out Cubic
+                ease = 4 * t * t * t if t < 0.5 else 1 - (-2 * t + 2)**3 / 2
+                
+                # Calculate ideal position at this time t
+                ideal_y = current_scroll + (distance * ease)
+                
+                # Scroll to it (absolute)
+                await content_frame.evaluate(f"window.scrollTo(0, {ideal_y})")
+                
+                # Mouse Drift (People move mouse slightly while scrolling)
+                await page.mouse.move(current_x + random.uniform(-2, 2), current_y + random.uniform(-10, 10))
+                
+                # Variable sleep (Performance jitter)
+                await asyncio.sleep(random.uniform(0.01, 0.03))
+                
+            # Final "Correction" scroll (tiny adjustment)
+            await asyncio.sleep(0.2)
+            await content_frame.evaluate(f"window.scrollTo(0, {target_y})")
+
+
+        async def human_move(start_x, start_y, end_x, end_y, steps=60, overshoot=True):
+            """
+            Advanced mouse movement with Overshoot & Correction.
+            """
+            # Target with Overshoot
+            if overshoot and random.random() < 0.7:
+                # Calculate a point slightly PAST the target
+                dx = end_x - start_x
+                dy = end_y - start_y
+                ov_factor = 1.1 # 10% overshoot
+                target_x = start_x + (dx * ov_factor)
+                target_y = start_y + (dy * ov_factor)
+                
+                # Move to overshoot point
+                await bezier_move(start_x, start_y, target_x, target_y, steps=int(steps*0.8))
+                
+                # Correction (Snap back)
+                await asyncio.sleep(0.05)
+                await bezier_move(target_x, target_y, end_x, end_y, steps=int(steps*0.3))
+            else:
+                # Direct precise move
+                await bezier_move(start_x, start_y, end_x, end_y, steps)
+
+        async def bezier_move(sx, sy, ex, ey, steps):
+             # Random control point deviation
+            offset = random.randint(-150, 150)
+            ctrl_x = (sx + ex) / 2 + offset
+            ctrl_y = (sy + ey) / 2 + (offset / 2)
+            
+            for i in range(steps + 1):
+                t = i / steps
+                nt = 1 - t
+                x = (nt**2 * sx) + (2 * nt * t * ctrl_x) + (t**2 * ex)
+                y = (nt**2 * sy) + (2 * nt * t * ctrl_y) + (t**2 * ey)
+                
+                # Add tiny jitter (hand tremors)
+                x += random.uniform(-1, 1)
+                y += random.uniform(-1, 1)
+                
+                await page.mouse.move(x, y)
+                # Fast in middle, slow at ends
+                await asyncio.sleep(0.005 + 0.01 * (4 * (t - 0.5)**2))
+
+
+        async def move_and_hover(selector):
+             """Same logic but uses the new human_move"""
              try:
                  box = await content_frame.evaluate(f"""(sel) => {{
                      const el = document.querySelector(sel);
@@ -412,78 +491,105 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                  
                  if box:
                      vx, vy = frame_to_viewport(box['x'], box['y'])
-                     await human_move(current_x, current_y, vx, vy, steps=50)
-                     return vx, vy # Update current pos
+                     await human_move(current_x, current_y, vx, vy, steps=random.randint(40, 70), overshoot=True)
+                     return vx, vy 
              except Exception as e:
                  print(f"Prop Move Failed: {e}")
              return current_x, current_y
 
-        # 1. HERO PHASE (0-4s) - Loading & Intro
+        # --- CHOREOGRAPHY ---
+
+        # 1. HERO PHASE (0-4s)
         print("Phase 1: Hero")
-        await asyncio.sleep(3.5) # Wait for Shutter/Loading animation
-        # Move to "View All Work" button just to hint action
+        await asyncio.sleep(3.0) 
+        # "Reading" Jitter - Mouse wanders while eyes read
+        for _ in range(20):
+            await page.mouse.move(current_x + random.uniform(-5,5), current_y + random.uniform(-5,5))
+            await asyncio.sleep(0.05)
+            
+        # Hint at button
         current_x, current_y = await move_and_hover(".liquid-btn")
-        await asyncio.sleep(1.0) 
+        await asyncio.sleep(0.5)
 
         # 2. ABOUT PHASE (4-8s)
         print("Phase 2: About")
-        await content_frame.evaluate("window.scrollTo({top: window.innerHeight * 0.9, behavior: 'smooth'})")
-        await asyncio.sleep(2.0)
-        # Read the text (Slow pan)
-        await human_move(current_x, current_y, 800, 500, steps=80)
+        viewport_h = 1080 # Approx
+        await human_scroll_to(900) # Scroll to About
+        await asyncio.sleep(1.0)
+        
+        # Trace text (Reading line)
+        current_x, current_y = 200, 600
+        await human_move(current_x, current_y, 800, 600, steps=100, overshoot=False)
+        current_x, current_y = 800, 600
         
         # 3. PROCESS PHASE (8-14s)
         print("Phase 3: Process")
-        await content_frame.evaluate("window.scrollTo({top: window.innerHeight * 1.8, behavior: 'smooth'})")
-        await asyncio.sleep(1.5)
+        await human_scroll_to(1800)
+        await asyncio.sleep(1.0)
         
-        # Hover over Process Steps to trigger dots
-        steps = [".process-step:nth-child(1)", ".process-step:nth-child(3)", ".process-step:nth-child(5)"]
-        for step in steps:
-            await move_and_hover(step, hover_duration=0.5)
-            await asyncio.sleep(0.5)
+        # Hover steps with hesitation
+        # Step 1
+        current_x, current_y = await move_and_hover(".process-step:nth-child(1)")
+        await asyncio.sleep(0.8)
+        # Step 3
+        current_x, current_y = await move_and_hover(".process-step:nth-child(3)")
+        await asyncio.sleep(0.8)
 
         # 4. TECH ARSENAL (14-17s)
         print("Phase 4: Tech Arsenal")
-        await content_frame.evaluate("document.getElementById('tech').scrollIntoView({behavior: 'smooth'})")
-        await asyncio.sleep(1.5)
-        # Move mouse rapidly across columns to affect the speed (if interactive)
-        await human_move(200, 500, 800, 500, steps=20)
+        # Get Y position of tech section
+        tech_y = await content_frame.evaluate("document.getElementById('tech').offsetTop")
+        await human_scroll_to(tech_y)
         await asyncio.sleep(1.0)
         
-        # 5. PROJECTS SLIDER (17-25s)
-        print("Phase 5: Projects ( pinned )")
-        await content_frame.evaluate("document.getElementById('projects').scrollIntoView({behavior: 'smooth'})")
+        # fast interact
+        await human_move(300, 600, 800, 600, steps=30)
+        current_x, current_y = 800, 600
+        await asyncio.sleep(0.5)
+
+        # 5. PROJECTS (17-25s)
+        print("Phase 5: Projects")
+        proj_y = await content_frame.evaluate("document.getElementById('projects').offsetTop")
+        await human_scroll_to(proj_y)
+        await asyncio.sleep(0.5)
+        
+        # Deep Scroll for Pinning
+        # We need to scroll significantly to drive the GSAP slider
+        start_scroll = await content_frame.evaluate("window.scrollY")
+        end_scroll = start_scroll + 3000 # 3000px deep
+        await human_scroll_to(end_scroll, speed="fast")
         await asyncio.sleep(1.0)
         
-        # Scroll DEEP to animate the pinned slider
-        # We need to scroll approx 3-4 viewports worth
-        for _ in range(5):
-             await content_frame.evaluate("window.scrollBy({top: window.innerHeight * 0.8, left: 0, behavior: 'smooth'})")
-             await asyncio.sleep(1.2) # Wait for slide transition
-        
-        # 6. STATS / AUTHORITY (25-28s)
+        # 6. STATS (25-28s)
         print("Phase 6: Authority")
-        await content_frame.evaluate("document.getElementById('authority').scrollIntoView({behavior: 'smooth'})")
-        await asyncio.sleep(1.5)
-        
-        # Trigger Spotlight Effect
-        box = await move_and_hover(".stat-box:nth-child(2)") # Projects Shipped
-        # Wiggle to show spotlight
-        for _ in range(15):
-             await page.mouse.move(current_x + random.randint(-50,50), current_y + random.randint(-50,50))
-             await asyncio.sleep(0.02)
-             
-        # 7. CONTACT (28-30s)
-        print("Phase 7: Contact")
-        await content_frame.evaluate("document.getElementById('contact-form-section').scrollIntoView({behavior: 'smooth'})")
+        auth_y = await content_frame.evaluate("document.getElementById('authority').offsetTop")
+        await human_scroll_to(auth_y)
         await asyncio.sleep(1.0)
         
-        # Hover Submit
+        # Spotlight Play
+        await move_and_hover(".stat-box:nth-child(2)")
+        # Circular wiggle (Spotlight)
+        center_x, center_y = current_x, current_y
+        for i in range(20):
+            import math
+            angle = i * 0.5
+            radius = 30
+            mx = center_x + math.cos(angle) * radius
+            my = center_y + math.sin(angle) * radius
+            await page.mouse.move(mx, my)
+            await asyncio.sleep(0.02)
+            
+        # 7. CONTACT
+        print("Phase 7: Contact")
+        # Scroll to bottom
+        total_h = await content_frame.evaluate("document.body.scrollHeight")
+        await human_scroll_to(total_h - 1000)
+        await asyncio.sleep(1.0)
+        
         await move_and_hover(".submit-btn")
         await asyncio.sleep(1.0)
         
-        # End of Script
+        # End Script
                 
         # Save Video Logic - Correct Sequence
         video = page.video
