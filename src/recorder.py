@@ -33,7 +33,7 @@ def run_server_in_thread():
 
 class VelocityInput:
     """
-    Simulates physical input devices with momentum, friction, and biological tremors.
+    Simulates physical input devices with momentum.
     """
     def __init__(self, page, frame, wrapper_offset, scale_factor):
         self.page = page
@@ -49,212 +49,153 @@ class VelocityInput:
         return vx, vy
 
     async def human_move(self, target_fx, target_fy, speed="normal", overshoot=True):
-        """
-        Moves mouse to a Frame Coordinate (fx, fy) using:
-        1. Fitts's Law approximation (speed proportional to distance).
-        2. Biological sub-movements (initial impulse + correction).
-        3. Motor variations (jitter).
-        """
         vx, vy = self.frame_to_viewport(target_fx, target_fy)
+        dist = math.hypot(vx - self.mouse_x, vy - self.mouse_y)
+        duration = 0.4 + (dist / 3000.0) 
+        if speed == "fast": duration *= 0.6
         
-        start_x, start_y = self.mouse_x, self.mouse_y
-        dist = math.hypot(vx - start_x, vy - start_y)
-        
-        # Duration based on distance (Fitts Law-ish)
-        # Closer = faster relative to distance, Farther = slower
-        base_time = 0.3 if speed == "fast" else 0.5 # AGGRESSIVE: Faster base
-        duration = base_time + (dist / 3000.0)      # AGGRESSIVE: Faster travel
-        
-        if overshoot and dist > 100:
-            # Main ballistic movement
-            overshoot_dist = min(dist * 0.1, 50)
-            angle = math.atan2(vy - start_y, vx - start_x)
-            ov_x = vx + math.cos(angle) * overshoot_dist
-            ov_y = vy + math.sin(angle) * overshoot_dist
-            
-            await self._bezier_curve(start_x, start_y, ov_x, ov_y, duration * 0.8)
-            await asyncio.sleep(random.uniform(0.05, 0.1)) # Reaction time
-            await self._bezier_curve(ov_x, ov_y, vx, vy, duration * 0.3) # Correction
-        else:
-            await self._bezier_curve(start_x, start_y, vx, vy, duration)
-            
+        await self._bezier_curve(self.mouse_x, self.mouse_y, vx, vy, duration)
         self.mouse_x, self.mouse_y = vx, vy
 
     async def _bezier_curve(self, sx, sy, ex, ey, duration):
-        steps = int(duration * 60) # 60fps
+        steps = int(duration * 60)
         if steps < 1: steps = 1
 
-        # Control points for arc
-        offset_strength = random.randint(-100, 100)
-        cx = (sx + ex) / 2 + random.randint(-50, 50)
+        offset_strength = random.randint(-50, 50)
+        cx = (sx + ex) / 2 + random.randint(-20, 20)
         cy = (sy + ey) / 2 + offset_strength
         
         for i in range(steps + 1):
             t = i / steps
-            
-            # Bezier Path
             nt = 1 - t
             bx = (nt**2 * sx) + (2 * nt * t * cx) + (t**2 * ex)
             by = (nt**2 * sy) + (2 * nt * t * cy) + (t**2 * ey)
-            
-            # Micro-tremors (Bio-noise) - Reduced for speed
-            noise = random.uniform(-0.5, 0.5)
-            
-            await self.page.mouse.move(bx + noise, by + noise)
-            
-            # Timing: Constant delta for smoothness
-            dt = duration / steps
-            await asyncio.sleep(dt)
+            await self.page.mouse.move(bx, by)
+            await asyncio.sleep(duration / steps)
 
-    async def kinetic_scroll_to(self, target_y):
+    async def smooth_glide(self, start_y, end_y, duration):
         """
-        Simulates "Flick" scrolling with inertial decay.
+        Smooth linear scroll to cover ground.
         """
-        current_y = await self.frame.evaluate("window.scrollY")
-        if abs(target_y - current_y) < 20: return
+        steps = int(duration * 60) # 60fps
+        if steps == 0: return
 
-        distance = target_y - current_y
+        dist = end_y - start_y
+        step_size = dist / steps
         
-        # 1. ACCELERATE (The Flick)
-        # We ramp up velocity quickly
-        velocity = 0
-        direction = 1 if distance > 0 else -1
+        current_y = start_y
         
-        # AGGRESSIVE: Turbo flicks
-        # Peak velocity higher, divisor lower
-        peak_velocity = min(abs(distance) / 3, 200) * direction
+        for i in range(steps):
+             current_y += step_size
+             await self.frame.evaluate(f"window.scrollTo(0, {current_y})")
+             
+             # Gentle mouse sway
+             sway = math.sin(i * 0.1) * 20
+             await self.page.mouse.move(self.mouse_x + sway, self.mouse_y)
+             
+             await asyncio.sleep(duration / steps)
         
-        # Simulation Loop
-        pos = current_y
-        velocity = peak_velocity # Instant flick start for responsiveness
-        
-        # Physics Params
-        friction = 0.90 # Less friction -> slides further/faster
-        
-        while abs(pos - target_y) > 20 and abs(velocity) > 1.0:
-            # Apply Friction
-            velocity *= friction
-            
-            # Update Position
-            pos += velocity
-            
-            # Boundary Check
-            if (direction > 0 and pos > target_y) or (direction < 0 and pos < target_y):
-                # We overshot or arrived
-                pos = target_y
-                break
-                
-            await self.frame.evaluate(f"window.scrollTo(0, {pos})")
-            
-            # Drift is minimal at high speeds
-            
-            await asyncio.sleep(0.016) # ~60fps
-            
-        # Final snap
-        await self.frame.evaluate(f"window.scrollTo(0, {target_y})")
+        await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
 
 
 async def analyze_and_choreograph(page, frame, input_sys):
-    """
-    Scans the page for semantic meaning and creates a improv performance.
-    """
-    print(">> AI Director: Scanning Scene...")
-    start_time = time.time()
+    print(">> AI Director: 30s Full Page Scan...")
     
-    # 1. DISCOVER SECTIONS
-    all_sections = await frame.evaluate("""() => {
-        const candidates = document.querySelectorAll('section, header, footer, .hero, .panel, div[id]');
-        const results = [];
-        
-        candidates.forEach((el, index) => {
-            const rect = el.getBoundingClientRect();
-            if (rect.height < 100) return;
-            
-            const headers = Array.from(el.querySelectorAll('h1, h2, h3'))
-                                .map(h => {
-                                    const r = h.getBoundingClientRect();
-                                    return { text: h.innerText, x: r.left+r.width/2, y: r.top+r.height/2 };
-                                });
-            
-            results.push({
-                index: index,
-                id: el.id || el.className || 'section-'+index,
-                top: rect.top + window.scrollY,
-                height: rect.height,
-                headers: headers
-            });
-        });
-        
-        // Dedup
-        const unique = [];
-        const seenY = new Set();
-        results.forEach(r => {
-            const y = Math.floor(r.top / 100) * 100;
-            if(!seenY.has(y)) {
-                seenY.add(y);
-                unique.push(r);
-            }
-        });
-        
-        return unique.sort((a,b) => a.top - b.top);
+    # 1. GET KEY METRICS
+    total_height = await frame.evaluate("document.body.scrollHeight")
+    viewport_h = await frame.evaluate("window.innerHeight")
+    
+    # We need to reach (total_height - viewport_h)
+    max_scroll = total_height - viewport_h
+    
+    # 2. THE TIMELINE (30s)
+    # 0-5s: Hero Interaction
+    # 5-25s: The Glide (Cover 100% of height)
+    # 25-30s: Footer Interaction
+    
+    # --- ACT 1: HERO (5s) ---
+    print(">> Act 1: Hero")
+    
+    # Find Hero element
+    hero_center = await frame.evaluate("""() => {
+        const h = document.querySelector('section, header');
+        const r = h.getBoundingClientRect();
+        return {x: r.left + r.width/2, y: r.top + r.height/2};
     }""")
     
-    # AGGRESSIVE: FILTER FOR HIGHLIGHTS
-    # We want: 1. Start (Hero), 2. Important Middle (Project/About), 3. End (Contact)
-    # Total Scenes target: 4-5 max
+    # Move to center
+    await input_sys.human_move(hero_center['x'], hero_center['y'], speed="slow")
+    await asyncio.sleep(1.0)
     
-    sections = []
-    if all_sections:
-        sections.append(all_sections[0]) # Always Hero
+    # Interaction: Circle?
+    cx, cy = input_sys.mouse_x, input_sys.mouse_y
+    for i in range(30):
+        a = i * 0.3
+        r = 30
+        await page.mouse.move(cx + math.cos(a)*r, cy + math.sin(a)*r)
+        await asyncio.sleep(0.02)
         
-        # Find 'About' or 'Project'
-        middles = [s for s in all_sections[1:-1] if 'project' in s['id'].lower() or 'about' in s['id'].lower() or 'showcase' in s['id'].lower()]
-        # Take max 2 middle sections
-        if middles:
-            sections.extend(middles[:2])
-            
-        # Always Last (Contact/Footer)
-        if len(all_sections) > 1:
-            sections.append(all_sections[-1])
+    await asyncio.sleep(1.0)
     
-    print(f">> AI Director: Selected {len(sections)} Key Scenes from {len(all_sections)} found.")
+    # --- ACT 2: THE GLIDE (20s) ---
+    print(">> Act 2: Full Page Glide")
     
-    # 2. PERFORM
+    # We want to scroll from 0 to max_scroll in 20 seconds.
+    # But we want to pause briefly at "Projects" if found.
     
-    for i, section in enumerate(sections):
-        # TIME CAP CHECK
-        if time.time() - start_time > 28.0:
-            print("!! TIME CAP REACHED - WRAPPING UP !!")
-            break
-            
-        print(f"   Action: Scene {i} ('{section['id']}')")
+    start_y = 0
+    # Find 'Projects' Y
+    projects_y = await frame.evaluate("""() => {
+        const el = document.getElementById('projects') || document.querySelector('.projects');
+        return el ? el.offsetTop : null;
+    }""")
+    
+    if projects_y:
+        # Split Glide: Hero -> Projects -> End
+        # Segment 1: Hero -> Projects
+        dist1 = projects_y - start_y
+        time1 = 6.0 # 6s to get to projects
         
-        # A. SCROLL TO SCENE
-        target_y = max(0, section['top'] - 50)
-        current_y = await frame.evaluate("window.scrollY")
+        await input_sys.smooth_glide(start_y, projects_y, duration=time1)
+        start_y = projects_y
         
-        if abs(target_y - current_y) > 100:
-            await input_sys.kinetic_scroll_to(target_y)
+        # Pause at Projects (2s)
+        print("   > Pausing at Projects")
+        # Visual scan
+        await input_sys.human_move(500, 800, speed="fast")
+        await asyncio.sleep(1.5)
         
-        # AGGRESSIVE: Minimal pause
-        await asyncio.sleep(0.1) 
+        # Segment 2: Projects -> End
+        dist2 = max_scroll - projects_y
+        time2 = 12.0 # 12s remaining for rest
+        await input_sys.smooth_glide(start_y, max_scroll, duration=time2)
         
-        # B. READ HEADLINES
-        # Only read on Hero or Project scenes, otherwise skip
-        should_read = i == 0 or 'project' in section['id'].lower()
+    else:
+        # No specific middle target, just Glide all way (18s)
+        await input_sys.smooth_glide(0, max_scroll, duration=18.0)
+    
+    # --- ACT 3: FOOTER (End) ---
+    print(">> Act 3: Footer/Contact")
+    
+    # Ensure we are fully at bottom
+    await frame.evaluate(f"window.scrollTo(0, {total_height})")
+    
+    # Find CTA Button
+    cta_pos = await frame.evaluate("""() => {
+        const b = document.querySelector('.submit-btn, button[type="submit"], .footer-link');
+        if(!b) return null;
+        const r = b.getBoundingClientRect();
+        return {x: r.left + r.width/2, y: r.top + r.height/2};
+    }""")
+    
+    if cta_pos:
+        # Move to CTA
+        await input_sys.human_move(cta_pos['x'], cta_pos['y'], speed="normal")
+        # Hover/Wiggle
+        await asyncio.sleep(0.5)
+        await input_sys.human_move(cta_pos['x']+10, cta_pos['y']+5, speed="slow")
         
-        if should_read and section['headers'] and random.random() < 0.6:
-             # Fast visual scan
-             await input_sys.page.wait_for_timeout(50)
-             
-             # Just fake a move to center-ish
-             await input_sys.human_move(500 + random.randint(-100,100), 500 + random.randint(-100,100), speed="fast", overshoot=False)
-             await asyncio.sleep(0.3)
-        
-        # C. DYNAMIC DURATION
-        # AGGRESSIVE: Cap at 0.8s max dwell
-        wait_time = min(section['height'] / 2000, 0.8) 
-        await asyncio.sleep(wait_time)
+    await asyncio.sleep(2.0) # Final freeze frame
 
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
@@ -467,6 +408,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
+        # Fixed 30s logic
         await analyze_and_choreograph(page, content_frame, inputs)
                 
         # Save
