@@ -62,8 +62,8 @@ class VelocityInput:
         
         # Duration based on distance (Fitts Law-ish)
         # Closer = faster relative to distance, Farther = slower
-        base_time = 0.5 if speed == "fast" else 0.8
-        duration = base_time + (dist / 2000.0) 
+        base_time = 0.3 if speed == "fast" else 0.5 # AGGRESSIVE: Faster base
+        duration = base_time + (dist / 3000.0)      # AGGRESSIVE: Faster travel
         
         if overshoot and dist > 100:
             # Main ballistic movement
@@ -73,7 +73,7 @@ class VelocityInput:
             ov_y = vy + math.sin(angle) * overshoot_dist
             
             await self._bezier_curve(start_x, start_y, ov_x, ov_y, duration * 0.8)
-            await asyncio.sleep(random.uniform(0.05, 0.15)) # Reaction time
+            await asyncio.sleep(random.uniform(0.05, 0.1)) # Reaction time
             await self._bezier_curve(ov_x, ov_y, vx, vy, duration * 0.3) # Correction
         else:
             await self._bezier_curve(start_x, start_y, vx, vy, duration)
@@ -97,9 +97,8 @@ class VelocityInput:
             bx = (nt**2 * sx) + (2 * nt * t * cx) + (t**2 * ex)
             by = (nt**2 * sy) + (2 * nt * t * cy) + (t**2 * ey)
             
-            # Micro-tremors (Bio-noise)
-            # Increases when moving slow (fine motor control struggles)
-            noise = random.uniform(-1, 1)
+            # Micro-tremors (Bio-noise) - Reduced for speed
+            noise = random.uniform(-0.5, 0.5)
             
             await self.page.mouse.move(bx + noise, by + noise)
             
@@ -112,7 +111,7 @@ class VelocityInput:
         Simulates "Flick" scrolling with inertial decay.
         """
         current_y = await self.frame.evaluate("window.scrollY")
-        if abs(target_y - current_y) < 10: return
+        if abs(target_y - current_y) < 20: return
 
         distance = target_y - current_y
         
@@ -121,18 +120,18 @@ class VelocityInput:
         velocity = 0
         direction = 1 if distance > 0 else -1
         
-        # SHORTS OPTIMIZATION: Faster flicks
-        # Peak velocity depends on distance, but capped higher
-        peak_velocity = min(abs(distance) / 8, 120) * direction
+        # AGGRESSIVE: Turbo flicks
+        # Peak velocity higher, divisor lower
+        peak_velocity = min(abs(distance) / 3, 200) * direction
         
         # Simulation Loop
         pos = current_y
         velocity = peak_velocity # Instant flick start for responsiveness
         
         # Physics Params
-        friction = 0.92 # Slightly more friction for "snappy" feel
+        friction = 0.90 # Less friction -> slides further/faster
         
-        while abs(pos - target_y) > 10 and abs(velocity) > 0.5:
+        while abs(pos - target_y) > 20 and abs(velocity) > 1.0:
             # Apply Friction
             velocity *= friction
             
@@ -147,10 +146,7 @@ class VelocityInput:
                 
             await self.frame.evaluate(f"window.scrollTo(0, {pos})")
             
-            # While scrolling, eyes (mouse) drift slightly
-            drift_x = self.mouse_x + random.randint(-2, 2)
-            drift_y = self.mouse_y + random.randint(-5, 5) 
-            await self.page.mouse.move(drift_x, drift_y)
+            # Drift is minimal at high speeds
             
             await asyncio.sleep(0.016) # ~60fps
             
@@ -163,56 +159,37 @@ async def analyze_and_choreograph(page, frame, input_sys):
     Scans the page for semantic meaning and creates a improv performance.
     """
     print(">> AI Director: Scanning Scene...")
+    start_time = time.time()
     
     # 1. DISCOVER SECTIONS
-    # We look for Semantic Tags or IDs
-    sections = await frame.evaluate("""() => {
+    all_sections = await frame.evaluate("""() => {
         const candidates = document.querySelectorAll('section, header, footer, .hero, .panel, div[id]');
         const results = [];
-        let runningY = 0;
         
         candidates.forEach((el, index) => {
             const rect = el.getBoundingClientRect();
-            // Filter invisible or tiny
             if (rect.height < 100) return;
-            // Filter nested? No, keeps it simple.
             
-            // Get 'Interest Points' inside
             const headers = Array.from(el.querySelectorAll('h1, h2, h3'))
                                 .map(h => {
                                     const r = h.getBoundingClientRect();
-                                    return { 
-                                        text: h.innerText, 
-                                        x: r.left + r.width/2,
-                                        y: r.top + r.height/2
-                                    };
-                                });
-                                
-            const buttons = Array.from(el.querySelectorAll('button, a[class*="btn"], .cta, [role="button"]'))
-                                .map(b => {
-                                    const r = b.getBoundingClientRect();
-                                    return {
-                                        selector: b.className,
-                                        x: r.left + r.width/2,
-                                        y: r.top + r.height/2
-                                    };
+                                    return { text: h.innerText, x: r.left+r.width/2, y: r.top+r.height/2 };
                                 });
             
             results.push({
                 index: index,
                 id: el.id || el.className || 'section-'+index,
-                top: rect.top + window.scrollY, // Absolute Y
+                top: rect.top + window.scrollY,
                 height: rect.height,
-                headers: headers,
-                buttons: buttons
+                headers: headers
             });
         });
         
-        // Remove duplicates (by Y)
+        // Dedup
         const unique = [];
         const seenY = new Set();
         results.forEach(r => {
-            const y = Math.floor(r.top / 100) * 100; // Fuzzy
+            const y = Math.floor(r.top / 100) * 100;
             if(!seenY.has(y)) {
                 seenY.add(y);
                 unique.push(r);
@@ -222,59 +199,61 @@ async def analyze_and_choreograph(page, frame, input_sys):
         return unique.sort((a,b) => a.top - b.top);
     }""")
     
-    print(f">> AI Director: Found {len(sections)} Scenes.")
+    # AGGRESSIVE: FILTER FOR HIGHLIGHTS
+    # We want: 1. Start (Hero), 2. Important Middle (Project/About), 3. End (Contact)
+    # Total Scenes target: 4-5 max
+    
+    sections = []
+    if all_sections:
+        sections.append(all_sections[0]) # Always Hero
+        
+        # Find 'About' or 'Project'
+        middles = [s for s in all_sections[1:-1] if 'project' in s['id'].lower() or 'about' in s['id'].lower() or 'showcase' in s['id'].lower()]
+        # Take max 2 middle sections
+        if middles:
+            sections.extend(middles[:2])
+            
+        # Always Last (Contact/Footer)
+        if len(all_sections) > 1:
+            sections.append(all_sections[-1])
+    
+    print(f">> AI Director: Selected {len(sections)} Key Scenes from {len(all_sections)} found.")
     
     # 2. PERFORM
     
     for i, section in enumerate(sections):
+        # TIME CAP CHECK
+        if time.time() - start_time > 28.0:
+            print("!! TIME CAP REACHED - WRAPPING UP !!")
+            break
+            
         print(f"   Action: Scene {i} ('{section['id']}')")
         
-        # A. SCROLL TO SCENE (Physics)
-        # We target slightly above the section top for context (padding)
+        # A. SCROLL TO SCENE
         target_y = max(0, section['top'] - 50)
-        
-        # Dont scroll if we are already close (first section)
         current_y = await frame.evaluate("window.scrollY")
+        
         if abs(target_y - current_y) > 100:
             await input_sys.kinetic_scroll_to(target_y)
         
-        # SHORTS OPTIMIZATION: Less hesitation
-        await asyncio.sleep(0.2) 
+        # AGGRESSIVE: Minimal pause
+        await asyncio.sleep(0.1) 
         
-        # B. READ HEADLINES or INTERACT
-        # Only if there are headers
-        if section['headers']:
-            # SHORTS OPTIMIZATION: Only read 40% of the time, keep it moving
-            if random.random() < 0.4:
-                # Let's do a "Visual Re-Scan" of the current viewport
-                await input_sys.page.wait_for_timeout(100) # tiny wait
-                
-                visible_points = await frame.evaluate("""() => {
-                    const nodes = document.querySelectorAll('h1, h2, h3, p, li, button, a');
-                    const points = [];
-                    const vh = window.innerHeight;
-                    nodes.forEach(n => {
-                        const r = n.getBoundingClientRect();
-                        if (r.top > 100 && r.bottom < vh - 100) {
-                            points.push({
-                                x: r.left + r.width / 2,
-                                y: r.top + r.height / 2
-                            });
-                        }
-                    });
-                    return points;
-                }""")
-                
-                if visible_points:
-                    # Trace just 1 item quickly
-                    p = random.choice(visible_points)
-                    await input_sys.human_move(p['x'], p['y'], speed="fast", overshoot=False)
-                    await asyncio.sleep(random.uniform(0.3, 0.6))
+        # B. READ HEADLINES
+        # Only read on Hero or Project scenes, otherwise skip
+        should_read = i == 0 or 'project' in section['id'].lower()
+        
+        if should_read and section['headers'] and random.random() < 0.6:
+             # Fast visual scan
+             await input_sys.page.wait_for_timeout(50)
+             
+             # Just fake a move to center-ish
+             await input_sys.human_move(500 + random.randint(-100,100), 500 + random.randint(-100,100), speed="fast", overshoot=False)
+             await asyncio.sleep(0.3)
         
         # C. DYNAMIC DURATION
-        # SHORTS OPTIMIZATION: Much faster reading
-        # Height / 1000 means 1000px height = 1s dwell. (Previously /500 = 2s)
-        wait_time = min(section['height'] / 1000, 1.2) 
+        # AGGRESSIVE: Cap at 0.8s max dwell
+        wait_time = min(section['height'] / 2000, 0.8) 
         await asyncio.sleep(wait_time)
 
 
@@ -488,7 +467,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
-        # Limit total duration to ~45s? We can just run the natural flow now that it's faster.
         await analyze_and_choreograph(page, content_frame, inputs)
                 
         # Save
