@@ -121,15 +121,16 @@ class VelocityInput:
         velocity = 0
         direction = 1 if distance > 0 else -1
         
-        # Peak velocity depends on distance, but capped
-        peak_velocity = min(abs(distance) / 15, 60) * direction
+        # SHORTS OPTIMIZATION: Faster flicks
+        # Peak velocity depends on distance, but capped higher
+        peak_velocity = min(abs(distance) / 8, 120) * direction
         
         # Simulation Loop
         pos = current_y
         velocity = peak_velocity # Instant flick start for responsiveness
         
         # Physics Params
-        friction = 0.95
+        friction = 0.92 # Slightly more friction for "snappy" feel
         
         while abs(pos - target_y) > 10 and abs(velocity) > 0.5:
             # Apply Friction
@@ -237,50 +238,43 @@ async def analyze_and_choreograph(page, frame, input_sys):
         if abs(target_y - current_y) > 100:
             await input_sys.kinetic_scroll_to(target_y)
         
-        await asyncio.sleep(0.5) # Take it in
+        # SHORTS OPTIMIZATION: Less hesitation
+        await asyncio.sleep(0.2) 
         
         # B. READ HEADLINES or INTERACT
         # Only if there are headers
         if section['headers']:
-            # Pick the biggest/first one
-            h = section['headers'][0]
-            # Convert scanned 'x' from page-load-coords to frame-coords?
-            # Actually our scan returned ClientRect relative to viewport AT THAT TIME.
-            # But we scrolled. So we can't use those X/Y directly.
-            # We must re-query based on element presence or just use random "reading" scan.
-            
-            # Let's do a "Visual Re-Scan" of the current viewport
-            await input_sys.page.wait_for_timeout(200)
-            
-            visible_points = await frame.evaluate("""() => {
-                const nodes = document.querySelectorAll('h1, h2, h3, p, li, button, a');
-                const points = [];
-                const vh = window.innerHeight;
-                nodes.forEach(n => {
-                    const r = n.getBoundingClientRect();
-                    if (r.top > 100 && r.bottom < vh - 100) {
-                        points.push({
-                            x: r.left + r.width / 2,
-                            y: r.top + r.height / 2
-                        });
-                    }
-                });
-                return points;
-            }""")
-            
-            if visible_points:
-                # Trace 1 or 2 items
-                selection = random.sample(visible_points, min(len(visible_points), 2))
-                for p in selection:
-                    await input_sys.human_move(p['x'], p['y'], speed="slow", overshoot=False)
-                    await asyncio.sleep(random.uniform(0.5, 1.5))
-            else:
-                 # Just idle breathe
-                 await asyncio.sleep(1.0)
+            # SHORTS OPTIMIZATION: Only read 40% of the time, keep it moving
+            if random.random() < 0.4:
+                # Let's do a "Visual Re-Scan" of the current viewport
+                await input_sys.page.wait_for_timeout(100) # tiny wait
+                
+                visible_points = await frame.evaluate("""() => {
+                    const nodes = document.querySelectorAll('h1, h2, h3, p, li, button, a');
+                    const points = [];
+                    const vh = window.innerHeight;
+                    nodes.forEach(n => {
+                        const r = n.getBoundingClientRect();
+                        if (r.top > 100 && r.bottom < vh - 100) {
+                            points.push({
+                                x: r.left + r.width / 2,
+                                y: r.top + r.height / 2
+                            });
+                        }
+                    });
+                    return points;
+                }""")
+                
+                if visible_points:
+                    # Trace just 1 item quickly
+                    p = random.choice(visible_points)
+                    await input_sys.human_move(p['x'], p['y'], speed="fast", overshoot=False)
+                    await asyncio.sleep(random.uniform(0.3, 0.6))
         
         # C. DYNAMIC DURATION
-        # Longer for sections with more height
-        wait_time = min(section['height'] / 500, 3.0) 
+        # SHORTS OPTIMIZATION: Much faster reading
+        # Height / 1000 means 1000px height = 1s dwell. (Previously /500 = 2s)
+        wait_time = min(section['height'] / 1000, 1.2) 
         await asyncio.sleep(wait_time)
 
 
@@ -494,6 +488,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
+        # Limit total duration to ~45s? We can just run the natural flow now that it's faster.
         await analyze_and_choreograph(page, content_frame, inputs)
                 
         # Save
