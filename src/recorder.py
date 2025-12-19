@@ -29,71 +29,298 @@ def run_server_in_thread():
     t.start()
     return t
 
-# --- Recorder Logic ---
+# --- ULTRAMODERN CHOREOGRAPHY ENGINE ---
+
+class VelocityInput:
+    """
+    Simulates physical input devices with momentum, friction, and biological tremors.
+    """
+    def __init__(self, page, frame, wrapper_offset, scale_factor):
+        self.page = page
+        self.frame = frame
+        self.wrapper_offset = wrapper_offset
+        self.scale_factor = scale_factor
+        self.mouse_x = 540
+        self.mouse_y = 960
+
+    def frame_to_viewport(self, fx, fy):
+        vx = self.wrapper_offset['x'] + (fx * self.scale_factor)
+        vy = self.wrapper_offset['y'] + (fy * self.scale_factor)
+        return vx, vy
+
+    async def human_move(self, target_fx, target_fy, speed="normal", overshoot=True):
+        """
+        Moves mouse to a Frame Coordinate (fx, fy) using:
+        1. Fitts's Law approximation (speed proportional to distance).
+        2. Biological sub-movements (initial impulse + correction).
+        3. Motor variations (jitter).
+        """
+        vx, vy = self.frame_to_viewport(target_fx, target_fy)
+        
+        start_x, start_y = self.mouse_x, self.mouse_y
+        dist = math.hypot(vx - start_x, vy - start_y)
+        
+        # Duration based on distance (Fitts Law-ish)
+        # Closer = faster relative to distance, Farther = slower
+        base_time = 0.5 if speed == "fast" else 0.8
+        duration = base_time + (dist / 2000.0) 
+        
+        if overshoot and dist > 100:
+            # Main ballistic movement
+            overshoot_dist = min(dist * 0.1, 50)
+            angle = math.atan2(vy - start_y, vx - start_x)
+            ov_x = vx + math.cos(angle) * overshoot_dist
+            ov_y = vy + math.sin(angle) * overshoot_dist
+            
+            await self._bezier_curve(start_x, start_y, ov_x, ov_y, duration * 0.8)
+            await asyncio.sleep(random.uniform(0.05, 0.15)) # Reaction time
+            await self._bezier_curve(ov_x, ov_y, vx, vy, duration * 0.3) # Correction
+        else:
+            await self._bezier_curve(start_x, start_y, vx, vy, duration)
+            
+        self.mouse_x, self.mouse_y = vx, vy
+
+    async def _bezier_curve(self, sx, sy, ex, ey, duration):
+        steps = int(duration * 60) # 60fps
+        if steps < 1: steps = 1
+
+        # Control points for arc
+        offset_strength = random.randint(-100, 100)
+        cx = (sx + ex) / 2 + random.randint(-50, 50)
+        cy = (sy + ey) / 2 + offset_strength
+        
+        for i in range(steps + 1):
+            t = i / steps
+            
+            # Bezier Path
+            nt = 1 - t
+            bx = (nt**2 * sx) + (2 * nt * t * cx) + (t**2 * ex)
+            by = (nt**2 * sy) + (2 * nt * t * cy) + (t**2 * ey)
+            
+            # Micro-tremors (Bio-noise)
+            # Increases when moving slow (fine motor control struggles)
+            noise = random.uniform(-1, 1)
+            
+            await self.page.mouse.move(bx + noise, by + noise)
+            
+            # Timing: Constant delta for smoothness
+            dt = duration / steps
+            await asyncio.sleep(dt)
+
+    async def kinetic_scroll_to(self, target_y):
+        """
+        Simulates "Flick" scrolling with inertial decay.
+        """
+        current_y = await self.frame.evaluate("window.scrollY")
+        if abs(target_y - current_y) < 10: return
+
+        distance = target_y - current_y
+        
+        # 1. ACCELERATE (The Flick)
+        # We ramp up velocity quickly
+        velocity = 0
+        direction = 1 if distance > 0 else -1
+        
+        # Peak velocity depends on distance, but capped
+        peak_velocity = min(abs(distance) / 15, 60) * direction
+        
+        # Simulation Loop
+        pos = current_y
+        velocity = peak_velocity # Instant flick start for responsiveness
+        
+        # Physics Params
+        friction = 0.95
+        
+        while abs(pos - target_y) > 10 and abs(velocity) > 0.5:
+            # Apply Friction
+            velocity *= friction
+            
+            # Update Position
+            pos += velocity
+            
+            # Boundary Check
+            if (direction > 0 and pos > target_y) or (direction < 0 and pos < target_y):
+                # We overshot or arrived
+                pos = target_y
+                break
+                
+            await self.frame.evaluate(f"window.scrollTo(0, {pos})")
+            
+            # While scrolling, eyes (mouse) drift slightly
+            drift_x = self.mouse_x + random.randint(-2, 2)
+            drift_y = self.mouse_y + random.randint(-5, 5) 
+            await self.page.mouse.move(drift_x, drift_y)
+            
+            await asyncio.sleep(0.016) # ~60fps
+            
+        # Final snap
+        await self.frame.evaluate(f"window.scrollTo(0, {target_y})")
+
+
+async def analyze_and_choreograph(page, frame, input_sys):
+    """
+    Scans the page for semantic meaning and creates a improv performance.
+    """
+    print(">> AI Director: Scanning Scene...")
+    
+    # 1. DISCOVER SECTIONS
+    # We look for Semantic Tags or IDs
+    sections = await frame.evaluate("""() => {
+        const candidates = document.querySelectorAll('section, header, footer, .hero, .panel, div[id]');
+        const results = [];
+        let runningY = 0;
+        
+        candidates.forEach((el, index) => {
+            const rect = el.getBoundingClientRect();
+            // Filter invisible or tiny
+            if (rect.height < 100) return;
+            // Filter nested? No, keeps it simple.
+            
+            // Get 'Interest Points' inside
+            const headers = Array.from(el.querySelectorAll('h1, h2, h3'))
+                                .map(h => {
+                                    const r = h.getBoundingClientRect();
+                                    return { 
+                                        text: h.innerText, 
+                                        x: r.left + r.width/2,
+                                        y: r.top + r.height/2
+                                    };
+                                });
+                                
+            const buttons = Array.from(el.querySelectorAll('button, a[class*="btn"], .cta, [role="button"]'))
+                                .map(b => {
+                                    const r = b.getBoundingClientRect();
+                                    return {
+                                        selector: b.className,
+                                        x: r.left + r.width/2,
+                                        y: r.top + r.height/2
+                                    };
+                                });
+            
+            results.push({
+                index: index,
+                id: el.id || el.className || 'section-'+index,
+                top: rect.top + window.scrollY, // Absolute Y
+                height: rect.height,
+                headers: headers,
+                buttons: buttons
+            });
+        });
+        
+        // Remove duplicates (by Y)
+        const unique = [];
+        const seenY = new Set();
+        results.forEach(r => {
+            const y = Math.floor(r.top / 100) * 100; // Fuzzy
+            if(!seenY.has(y)) {
+                seenY.add(y);
+                unique.push(r);
+            }
+        });
+        
+        return unique.sort((a,b) => a.top - b.top);
+    }""")
+    
+    print(f">> AI Director: Found {len(sections)} Scenes.")
+    
+    # 2. PERFORM
+    
+    for i, section in enumerate(sections):
+        print(f"   Action: Scene {i} ('{section['id']}')")
+        
+        # A. SCROLL TO SCENE (Physics)
+        # We target slightly above the section top for context (padding)
+        target_y = max(0, section['top'] - 50)
+        
+        # Dont scroll if we are already close (first section)
+        current_y = await frame.evaluate("window.scrollY")
+        if abs(target_y - current_y) > 100:
+            await input_sys.kinetic_scroll_to(target_y)
+        
+        await asyncio.sleep(0.5) # Take it in
+        
+        # B. READ HEADLINES or INTERACT
+        # Only if there are headers
+        if section['headers']:
+            # Pick the biggest/first one
+            h = section['headers'][0]
+            # Convert scanned 'x' from page-load-coords to frame-coords?
+            # Actually our scan returned ClientRect relative to viewport AT THAT TIME.
+            # But we scrolled. So we can't use those X/Y directly.
+            # We must re-query based on element presence or just use random "reading" scan.
+            
+            # Let's do a "Visual Re-Scan" of the current viewport
+            await input_sys.page.wait_for_timeout(200)
+            
+            visible_points = await frame.evaluate("""() => {
+                const nodes = document.querySelectorAll('h1, h2, h3, p, li, button, a');
+                const points = [];
+                const vh = window.innerHeight;
+                nodes.forEach(n => {
+                    const r = n.getBoundingClientRect();
+                    if (r.top > 100 && r.bottom < vh - 100) {
+                        points.push({
+                            x: r.left + r.width / 2,
+                            y: r.top + r.height / 2
+                        });
+                    }
+                });
+                return points;
+            }""")
+            
+            if visible_points:
+                # Trace 1 or 2 items
+                selection = random.sample(visible_points, min(len(visible_points), 2))
+                for p in selection:
+                    await input_sys.human_move(p['x'], p['y'], speed="slow", overshoot=False)
+                    await asyncio.sleep(random.uniform(0.5, 1.5))
+            else:
+                 # Just idle breathe
+                 await asyncio.sleep(1.0)
+        
+        # C. DYNAMIC DURATION
+        # Longer for sections with more height
+        wait_time = min(section['height'] / 500, 3.0) 
+        await asyncio.sleep(wait_time)
+
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     """
-    Records a webpage interaction via localhost using an IFRAME isolation strategy.
-    The Host Page is 1080x1920 (Presentation).
-    The Content is an Iframe (375x100%) scaled up.
+    Records a webpage interaction via localhost using an IFRAME logic.
     """
     rel_path = os.path.relpath(file_path, SERVER_ROOT)
     target_url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
     
-    print(f"Recording URL: {target_url} | Duration: {duration}s")
+    print(f"Recording URL: {target_url}")
 
     async with async_playwright() as p:
-        # Launch with flags to bypass CORS and X-Frame-Options for universal Iframe support
         browser = await p.chromium.launch(
             headless=True,
-            args=[
-                '--enable-features=OverlayScrollbar', 
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process'
-            ]
+            args=['--enable-features=OverlayScrollbar', '--no-sandbox', '--disable-web-security']
         )
         
+        # Standard Presentation Viewport
         context = await browser.new_context(
             viewport={"width": 1080, "height": 1920},
             device_scale_factor=1.0,
-            has_touch=True,
             record_video_dir=os.path.dirname(output_path),
             record_video_size={"width": 1080, "height": 1920}
         )
         
         page = await context.new_page()
         
-        # --- IFRAME HOST PAGE GENERATION ---
-        # "Universal Clean Layout" Strategy
-        # 1. Background: Dynamic/Dark.
-        # 2. Container: "Presentation Window" - A clean, sharp, maximized container.
-        # 3. Content: 100% Fit Iframe. No cutting.
-        
-        # --- VIRAL LAYOUT ENGINE (DESKTOP MODE) ---
-        # User Feedback: "Proper Website Display", "No Cutting".
-        # Solution: Switch from Mobile (430px) to Desktop (1024px).
-        # This provides a massive, professional viewport.
-        
+        # --- UI CONSTANTS ---
         VIRTUAL_W = 1024 
-        
-        # Maximize the container height to fill the Short
-        # Header (~150) + Footer (~150) = 300. 1920 - 300 = 1620.
+        # Maximize vertically
         CONTAINER_H = 1550 
-        
-        # We need to fit 1024px into the 1080px video (with margins).
-        # Target Container Width: 1000px (40px margin total)
         CONTAINER_W = 1000
-        
-        # Scale: Shrink slightly to fit
-        SCALE_FACTOR = CONTAINER_W / VIRTUAL_W # ~0.97
-        
+        SCALE_FACTOR = CONTAINER_W / VIRTUAL_W
+
         # Header/Footer Text Defaults
-        header_txt = overlay_header if overlay_header else "WEB DESIGN AWARDS"
-        title_txt = overlay_text if overlay_text else "FUTURE OF WEB"
-        cta_txt = cta_text if cta_text else "VISIT WEBSITE"
-        sub_txt = cta_subtext if cta_subtext else "LINK IN BIO"
+        header_txt = overlay_header.upper() if overlay_header else "WEB DESIGN AWARDS"
+        title_txt = overlay_text.upper() if overlay_text else "FUTURE OF WEB"
+        cta_txt = cta_text.upper() if cta_text else "VISIT WEBSITE"
+        sub_txt = cta_subtext.upper() if cta_subtext else "LINK IN BIO"
 
         host_html = f"""
         <!DOCTYPE html>
@@ -103,7 +330,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 body {{
                     margin: 0; padding: 0;
                     width: 1080px; height: 1920px;
-                    /* VIBRANT Background */
                     background: linear-gradient(-45deg, #1a1a2e, #16213e, #4a1c40, #1a1a2e);
                     background-size: 400% 400%;
                     animation: gradientBG 15s ease infinite;
@@ -113,8 +339,8 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    justify-content: space-between; /* Push Footer down */
-                    padding-bottom: 40px; /* Small bottom padding */
+                    justify-content: space-between;
+                    padding-bottom: 40px;
                 }}
                 
                 @keyframes gradientBG {{
@@ -123,119 +349,61 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     100% {{ background-position: 0% 50%; }}
                 }}
                 
-                /* --- HEADER SECTION --- */
+                /* HEADER */
                 #header-group {{
-                    margin-top: 50px; /* Reduced top margin */
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    z-index: 10;
-                    height: 140px; /* Compact header */
-                    flex-shrink: 0;
+                    margin-top: 50px;
+                    display: flex; flex-direction: column; align-items: center;
+                    z-index: 10; height: 140px; flex-shrink: 0;
                 }}
-                
-                #p-header {{
-                    font-size: 30px; font-weight: 700; letter-spacing: 4px;
-                    color: #888; text-transform: uppercase;
-                }}
-                
+                #p-header {{ font-size: 30px; font-weight: 700; letter-spacing: 4px; color: #888; text-transform: uppercase; }}
                 #p-title {{
-                    font-size: 50px; font-weight: 900;
-                    text-align: center;
+                    font-size: 50px; font-weight: 900; text-align: center;
                     background: linear-gradient(135deg, #fff 0%, #aaa 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    margin-top: 10px;
-                    line-height: 1.1;
-                    max-width: 900px;
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                    margin-top: 10px; line-height: 1.1; max-width: 900px;
                 }}
                 
-                /* --- PRESENTATION WINDOW (The "Screen") --- */
+                /* PRESENTATION WINDOW */
                 #presentation-window {{
                     position: relative;
-                    width: {CONTAINER_W}px;
-                    height: {CONTAINER_H}px;
-                    
-                    /* Premium "Pop" Styling */
+                    width: {CONTAINER_W}px; height: {CONTAINER_H}px;
                     background: #fff;
-                    
-                    /* Deep, Multi-layered Shadow */
-                    box-shadow: 
-                        0 0 0 1px rgba(0,0,0, 0.8), 
-                        0 30px 80px rgba(0,0,0, 0.7),
-                        0 0 150px rgba(0,0,0, 0.9);
-                        
-                    overflow: hidden; 
-                    
-                    /* Desktop Radius is usually sharper */
-                    border-radius: 12px; 
-                    
+                    box-shadow: 0 0 0 1px rgba(0,0,0, 0.8), 0 30px 80px rgba(0,0,0, 0.7), 0 0 150px rgba(0,0,0, 0.9);
+                    overflow: hidden; border-radius: 12px;
                     border: 4px solid rgba(255, 255, 255, 0.1);
                     display: flex; flex-direction: column;
                 }}
                 
-                /* Browser Mockup Header */
                 #browser-header {{
-                    height: 40px;
-                    background: #f0f0f0;
-                    border-bottom: 1px solid #ddd;
-                    display: flex; align-items: center;
-                    padding: 0 15px; gap: 10px;
-                    flex-shrink: 0; /* Prevent header from shrinking */
+                    height: 40px; background: #f0f0f0; border-bottom: 1px solid #ddd;
+                    display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0;
                 }}
                 .browser-dot {{ width: 12px; height: 12px; border-radius: 50%; }}
                 .dot-red {{ background: #ff5f56; }}
                 .dot-yellow {{ background: #ffbd2e; }}
                 .dot-green {{ background: #27c93f; }}
-                .browser-bar {{
-                    flex-grow: 1; height: 24px; background: #fff; border-radius: 4px;
-                    margin-left: 10px; border: 1px solid #e0e0e0;
-                }}
+                .browser-bar {{ flex-grow: 1; height: 24px; background: #fff; border-radius: 4px; margin-left: 10px; border: 1px solid #e0e0e0; }}
                 
                 #content-iframe {{
                     width: {VIRTUAL_W}px;
-                    /* Subtract Header Height (40px) to fit perfectly */
-                    height: {int((CONTAINER_H - 40) / SCALE_FACTOR)}px; 
-                    border: none;
-                    background: #fff;
-                    
-                    transform: scale({SCALE_FACTOR});
-                    transform-origin: top left;
-                    
-                    /* Ensure full rendering */
-                    display: block;
+                    height: {int((CONTAINER_H - 40) / SCALE_FACTOR)}px;
+                    border: none; background: #fff;
+                    transform: scale({SCALE_FACTOR}); transform-origin: top left; display: block;
                 }}
                 
-                /* --- FOOTER SECTION --- */
+                /* FOOTER */
                 #footer-group {{
-                    margin-bottom: 90px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 15px;
-                    z-index: 10;
-                    height: 200px;
-                    justify-content: flex-end;
+                    margin-bottom: 90px; display: flex; flex-direction: column;
+                    align-items: center; gap: 15px; z-index: 10; height: 200px; justify-content: flex-end;
                 }}
-                
                  .cta-button {{
-                    background: #fff; /* High contrast */
-                    color: #000;
-                    padding: 25px 80px;
-                    border-radius: 4px; /* Sharp professional look */
-                    font-weight: 900;
-                    font-size: 45px;
-                    text-transform: uppercase;
-                    letter-spacing: 2px;
+                    background: #fff; color: #000; padding: 25px 80px;
+                    border-radius: 4px; font-weight: 900; font-size: 45px;
+                    text-transform: uppercase; letter-spacing: 2px;
                     box-shadow: 0 10px 40px rgba(255, 255, 255, 0.2);
                     animation: pulse-glow 3s infinite ease-in-out;
                 }}
-                
-                .cta-subtext {{
-                    font-size: 26px; color: #666; font-weight: 600;
-                    letter-spacing: 2px; text-transform: uppercase;
-                }}
-                
+                .cta-subtext {{ font-size: 26px; color: #666; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }}
                 @keyframes pulse-glow {{
                     0% {{ transform: scale(1); }}
                     50% {{ transform: scale(1.02); box-shadow: 0 10px 60px rgba(255, 255, 255, 0.4); }}
@@ -243,16 +411,11 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                 }}
                 
                 #ai-cursor {{
-                    position: absolute; top: 0; left: 0;
-                    width: 30px; height: 30px;
-                    /* High Visibility Touch Indicator - Solid White */
-                    background: #ffffff;
-                    border: 2px solid rgba(0, 0, 0, 0.1);
-                    border-radius: 50%;
-                    pointer-events: none; z-index: 9999;
+                    position: absolute; top: 0; left: 0; width: 30px; height: 30px;
+                    background: #ffffff; border: 2px solid rgba(0, 0, 0, 0.1);
+                    border-radius: 50%; pointer-events: none; z-index: 9999;
                     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                    transition: transform 0.1s, background 0.2s, opacity 0.3s;
-                    opacity: 0; /* Hidden by default to prevent 0,0 glitch */
+                    transition: transform 0.1s, background 0.2s, opacity 0.3s; opacity: 0;
                 }}
             </style>
         </head>
@@ -280,42 +443,24 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             <div id="ai-cursor"></div>
             
             <script>
-                // Cursor Logic
                 const c = document.getElementById('ai-cursor');
                 let isVisible = false;
-                
                 document.addEventListener('mousemove', e => {{
-                    if (!isVisible) {{
-                        c.style.opacity = '1';
-                        isVisible = true;
-                    }}
+                    if (!isVisible) {{ c.style.opacity = '1'; isVisible = true; }}
                     c.style.left = e.clientX + 'px';
                     c.style.top = e.clientY + 'px';
-                }});
-                document.addEventListener('mousedown', () => {{
-                    c.style.transform = 'scale(0.8)';
-                    c.style.background = 'white';
-                }});
-                document.addEventListener('mouseup', () => {{
-                    c.style.transform = 'scale(1)';
-                    c.style.background = 'rgba(255, 50, 50, 0.8)';
                 }});
             </script>
         </body>
         </html>
         """
         
-        # Load the Host Page
         await page.set_content(host_html)
         
-        # Helper: Wait for Iframe to Load
-        # In Playwright, we can get the frame by name or URL? 
-        # Since it's dynamically loaded, we wait for the element then get content frame.
         iframe_element = await page.query_selector('#content-iframe')
         content_frame = await iframe_element.content_frame()
         
         if not content_frame:
-            # Wait a bit if not ready
             await page.wait_for_timeout(2000)
             content_frame = await iframe_element.content_frame()
             
@@ -323,315 +468,54 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             print("Error: Could not access content iframe.")
             return
 
-        # Wait for site to load inside iframe
         try:
             await content_frame.wait_for_load_state("networkidle")
         except:
             await page.wait_for_timeout(2000)
             
-        print("Iframe Loaded. Starting Interaction Loop.")
+        print("Iframe Loaded. Starting Action.")
         
-        # --- COORDINATE TRANSLATION SYSTEM ---
-        # We need to map [Frame X, Y] -> [Viewport X, Y] to move the mouse.
-        #
-        # Math:
-        # Wrapper is centered horizontally?
-        # Host: 1080w. Wrapper: (390 * 2.3) = 897w.
-        # Wrapper Left = (1080 - 897) / 2 = 91.5px.
-        # Wrapper Top = Computed by Flex (Margin 60 + Header ~100) = ~160px.
-        #
-        # BUT relying on static math is risky. Let's ask the page!
-        
-        async def get_wrapper_offset():
-            return await page.evaluate("""() => {
-                const rect = document.getElementById('presentation-window').getBoundingClientRect();
-                return { x: rect.left, y: rect.top };
-            }""")
-            
-        wrapper_offset = await get_wrapper_offset()
-        # Scale Factor is known: 2.3
-        
-        def frame_to_viewport(fx, fy):
-            # The iframe content is scaled by SCALE_FACTOR.
-            # So 1px in Frame = 2.3px in Viewport.
-            vx = wrapper_offset['x'] + (fx * SCALE_FACTOR)
-            vy = wrapper_offset['y'] + (fy * SCALE_FACTOR)
-            return vx, vy
-
-        # --- INTERACTION LOOP (Targeting the FRAME) ---
-        
-        # 1. Hide Scrollbars inside Iframe (Inject CSS into Frame)
+        # Hide Scrollbars
         await content_frame.add_style_tag(content="""
             ::-webkit-scrollbar { display: none; }
             body { -ms-overflow-style: none; scrollbar-width: none; }
         """)
 
-        start_time = time.time()
+        # Get Wrapper Offset for Mapping
+        wrapper_offset = await page.evaluate("""() => {
+            const rect = document.getElementById('presentation-window').getBoundingClientRect();
+            return { x: rect.left, y: rect.top };
+        }""")
         
-        # --- VIRAL CHOREOGRAPHY ENGINE ---
+        # Init Physics
+        inputs = VelocityInput(page, content_frame, wrapper_offset, SCALE_FACTOR)
         
-        async def human_move(start_x, start_y, end_x, end_y, steps=60):
-            """Moves mouse in a human-like quadratic bezier curve."""
-            # Random control point deviation
-            offset = random.randint(-200, 200)
-            ctrl_x = (start_x + end_x) / 2 + offset
-            ctrl_y = (start_y + end_y) / 2 + (offset / 2)
-            
-            for i in range(steps + 1):
-                t = i / steps
-                # Quadratic Bezier Formula
-                nt = 1 - t
-                x = (nt**2 * start_x) + (2 * nt * t * ctrl_x) + (t**2 * end_x)
-                y = (nt**2 * start_y) + (2 * nt * t * ctrl_y) + (t**2 * end_y)
-                
-                # Add tiny jitter
-                x += random.uniform(-2, 2)
-                y += random.uniform(-2, 2)
-                
-                await page.mouse.move(x, y)
-                # Variable sleep for acceleration/deceleration
-                # Fast in middle, slow at ends
-                await asyncio.sleep(0.005 + 0.01 * (4 * (t - 0.5)**2))
-
-        # Initial Center
-        current_x = 540 # Middle of 1080
-        current_y = 960 # Middle of 1920
-        await page.mouse.move(current_x, current_y)
-
-        # --- ULTRA-REALISTIC HUMAN ENGINE (GHOST CURSOR) ---
+        # Start Move
+        await page.mouse.move(540, 960)
         
-        async def human_scroll_to(target_y, speed="normal"):
-            """
-            Simulates a human scrolling to a position using 'Flick & Glide' physics.
-            Instead of one jump, we do many small scrolls with momentum.
-            """
-            current_scroll = await content_frame.evaluate("window.scrollY")
-            distance = target_y - current_scroll
-            if abs(distance) < 50: return # Already there
-            
-            # Physics param
-            steps = 20 if speed == "fast" else 40
-            
-            # We use a curve: Slow start -> Fast Middle -> Slow End
-            for i in range(steps):
-                t = i / steps
-                # Ease In Out Cubic
-                ease = 4 * t * t * t if t < 0.5 else 1 - (-2 * t + 2)**3 / 2
-                
-                # Calculate ideal position at this time t
-                ideal_y = current_scroll + (distance * ease)
-                
-                # Scroll to it (absolute)
-                await content_frame.evaluate(f"window.scrollTo(0, {ideal_y})")
-                
-                # Mouse Drift (People move mouse slightly while scrolling)
-                await page.mouse.move(current_x + random.uniform(-2, 2), current_y + random.uniform(-10, 10))
-                
-                # Variable sleep (Performance jitter)
-                await asyncio.sleep(random.uniform(0.01, 0.03))
-                
-            # Final "Correction" scroll (tiny adjustment)
-            await asyncio.sleep(0.2)
-            await content_frame.evaluate(f"window.scrollTo(0, {target_y})")
-
-
-        async def human_move(start_x, start_y, end_x, end_y, steps=60, overshoot=True):
-            """
-            Advanced mouse movement with Overshoot & Correction.
-            """
-            # Target with Overshoot
-            if overshoot and random.random() < 0.7:
-                # Calculate a point slightly PAST the target
-                dx = end_x - start_x
-                dy = end_y - start_y
-                ov_factor = 1.1 # 10% overshoot
-                target_x = start_x + (dx * ov_factor)
-                target_y = start_y + (dy * ov_factor)
-                
-                # Move to overshoot point
-                await bezier_move(start_x, start_y, target_x, target_y, steps=int(steps*0.8))
-                
-                # Correction (Snap back)
-                await asyncio.sleep(0.05)
-                await bezier_move(target_x, target_y, end_x, end_y, steps=int(steps*0.3))
-            else:
-                # Direct precise move
-                await bezier_move(start_x, start_y, end_x, end_y, steps)
-
-        async def bezier_move(sx, sy, ex, ey, steps):
-             # Random control point deviation
-            offset = random.randint(-150, 150)
-            ctrl_x = (sx + ex) / 2 + offset
-            ctrl_y = (sy + ey) / 2 + (offset / 2)
-            
-            for i in range(steps + 1):
-                t = i / steps
-                nt = 1 - t
-                x = (nt**2 * sx) + (2 * nt * t * ctrl_x) + (t**2 * ex)
-                y = (nt**2 * sy) + (2 * nt * t * ctrl_y) + (t**2 * ey)
-                
-                # Add tiny jitter (hand tremors)
-                x += random.uniform(-1, 1)
-                y += random.uniform(-1, 1)
-                
-                await page.mouse.move(x, y)
-                # Fast in middle, slow at ends
-                await asyncio.sleep(0.005 + 0.01 * (4 * (t - 0.5)**2))
-
-
-        async def move_and_hover(selector):
-             """Same logic but uses the new human_move"""
-             try:
-                 box = await content_frame.evaluate(f"""(sel) => {{
-                     const el = document.querySelector(sel);
-                     if(!el) return null;
-                     const r = el.getBoundingClientRect();
-                     return {{ x: r.left + r.width/2, y: r.top + r.height/2 }};
-                 }}""", selector)
-                 
-                 if box:
-                     vx, vy = frame_to_viewport(box['x'], box['y'])
-                     await human_move(current_x, current_y, vx, vy, steps=random.randint(40, 70), overshoot=True)
-                     return vx, vy 
-             except Exception as e:
-                 print(f"Prop Move Failed: {e}")
-             return current_x, current_y
-
         # --- CHOREOGRAPHY ---
-
-        # 1. HERO PHASE (0-5s) - "The Hook"
-        print("Phase 1: Hero & Interaction")
-        await asyncio.sleep(2.5) # Wait for initial load
-        
-        # SALESMAN MOVE: Highlight Scarcity ("Accepting Limited Projects")
-        print(">> Selling Scarcity")
-        badge_pos = await move_and_hover(".availability-badge")
-        # Draw a quick circle around it ("Look at this!")
-        cx, cy = current_x, current_y
-        for i in range(15):
-            import math
-            angle = i * 0.8
-            radius = 40
-            mx = cx + math.cos(angle) * radius * 1.5 # Ellipse
-            my = cy + math.sin(angle) * radius
-            await page.mouse.move(mx, my)
-            await asyncio.sleep(0.01)
-            
-        await asyncio.sleep(0.5)
-
-        # SALESMAN MOVE: Show functionality (Theme Toggle)
-        print(">> Selling Features (Theme)")
-        await move_and_hover("#theme-btn")
-        await asyncio.sleep(0.3)
-        await page.mouse.click(current_x, current_y)
-        await asyncio.sleep(1.5) # Let them see Light Mode
-        await page.mouse.click(current_x, current_y) # Switch back to Dark (Premium)
-        await asyncio.sleep(0.8)
-
-        # 2. ABOUT PHASE (5-8s) - smooth scroll via Nav
-        print("Phase 2: Navigation to About")
-        await move_and_hover("a[href='#about']")
-        await page.mouse.click(current_x, current_y)
-        await asyncio.sleep(1.5) # Wait for GSAP ScrollTo
-        
-        # Read the headline text (Trace line)
-        current_x, current_y = 200, 600
-        await human_move(current_x, current_y, 800, 600, steps=60, overshoot=False)
-        
-        # 3. PROCESS PHASE (8-14s)
-        print("Phase 3: Process")
-        await human_scroll_to(1800)
-        await asyncio.sleep(1.0)
-        
-        # Hover steps with hesitation
-        # Step 1
-        current_x, current_y = await move_and_hover(".process-step:nth-child(1)")
-        await asyncio.sleep(0.8)
-        # Step 3
-        current_x, current_y = await move_and_hover(".process-step:nth-child(3)")
-        await asyncio.sleep(0.8)
-
-        # 4. TECH ARSENAL (14-17s)
-        print("Phase 4: Tech Arsenal")
-        # Get Y position of tech section
-        tech_y = await content_frame.evaluate("document.getElementById('tech').offsetTop")
-        await human_scroll_to(tech_y)
-        await asyncio.sleep(1.0)
-        
-        # fast interact
-        await human_move(300, 600, 800, 600, steps=30)
-        current_x, current_y = 800, 600
-        await asyncio.sleep(0.5)
-
-        # 5. PROJECTS (17-25s)
-        print("Phase 5: Projects")
-        proj_y = await content_frame.evaluate("document.getElementById('projects').offsetTop")
-        await human_scroll_to(proj_y)
-        await asyncio.sleep(0.5)
-        
-        # Deep Scroll for Pinning
-        # We need to scroll significantly to drive the GSAP slider
-        start_scroll = await content_frame.evaluate("window.scrollY")
-        end_scroll = start_scroll + 3000 # 3000px deep
-        await human_scroll_to(end_scroll, speed="fast")
-        await asyncio.sleep(1.0)
-        
-        # 6. STATS (25-28s)
-        print("Phase 6: Authority")
-        auth_y = await content_frame.evaluate("document.getElementById('authority').offsetTop")
-        await human_scroll_to(auth_y)
-        await asyncio.sleep(1.0)
-        
-        # Spotlight Play
-        await move_and_hover(".stat-box:nth-child(2)")
-        # Circular wiggle (Spotlight)
-        center_x, center_y = current_x, current_y
-        for i in range(20):
-            import math
-            angle = i * 0.5
-            radius = 30
-            mx = center_x + math.cos(angle) * radius
-            my = center_y + math.sin(angle) * radius
-            await page.mouse.move(mx, my)
-            await asyncio.sleep(0.02)
-            
-        # 7. CONTACT
-        print("Phase 7: Contact")
-        # Scroll to bottom
-        total_h = await content_frame.evaluate("document.body.scrollHeight")
-        await human_scroll_to(total_h - 1000)
-        await asyncio.sleep(1.0)
-        
-        await move_and_hover(".submit-btn")
-        await asyncio.sleep(1.0)
-        
-        # End Script
+        await analyze_and_choreograph(page, content_frame, inputs)
                 
-        # Save Video Logic - Correct Sequence
+        # Save
         video = page.video
-        await context.close() # Writes video to disk
+        await context.close() 
         
-        saved_video_path = None
         if video:
             saved_video_path = await video.path()
-            
-        await browser.close()
-        
-        if saved_video_path:
-             if os.path.exists(output_path):
+            await browser.close()
+            if os.path.exists(output_path):
                  os.remove(output_path)
-             # Use shutil for cross-filesystem safety
-             import shutil
-             shutil.move(saved_video_path, output_path)
-             print(f"Video saved to {output_path}")
+            import shutil
+            shutil.move(saved_video_path, output_path)
+            print(f"Video saved to {output_path}")
         else:
+            await browser.close()
             print("Error: No video recorded.")
 
 if __name__ == "__main__":
     # Test execution
-    # Start server for testing
     run_server_in_thread()
-    time.sleep(1) # wait for server
+    time.sleep(1)
     
     test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
     asyncio.run(record_url(test_html, 30, "test_output.mp4"))
