@@ -11,7 +11,6 @@ import math
 # --- Helper to start a local server for the content ---
 PORT = 8000
 SERVER_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../")) 
-# We serve from project root so we can access content_pool/business_01
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -51,14 +50,18 @@ class VelocityInput:
     async def human_move(self, target_fx, target_fy, speed="normal", overshoot=True):
         vx, vy = self.frame_to_viewport(target_fx, target_fy)
         dist = math.hypot(vx - self.mouse_x, vy - self.mouse_y)
-        duration = 0.4 + (dist / 3000.0) 
-        if speed == "fast": duration *= 0.6
+        # Faster Duration for Shorts
+        duration = 0.3 + (dist / 4000.0) 
+        if speed == "fast": duration *= 0.5
         
         await self._bezier_curve(self.mouse_x, self.mouse_y, vx, vy, duration)
         self.mouse_x, self.mouse_y = vx, vy
 
     async def _bezier_curve(self, sx, sy, ex, ey, duration):
-        steps = int(duration * 60)
+        # PERFORMANCE FIX: Reduce FPS from 60 to 12
+        # Reduce IPC overhead
+        fps = 12
+        steps = int(duration * fps)
         if steps < 1: steps = 1
 
         offset_strength = random.randint(-50, 50)
@@ -71,13 +74,16 @@ class VelocityInput:
             bx = (nt**2 * sx) + (2 * nt * t * cx) + (t**2 * ex)
             by = (nt**2 * sy) + (2 * nt * t * cy) + (t**2 * ey)
             await self.page.mouse.move(bx, by)
+            # Sleep longer between frames -> less CPU burn
             await asyncio.sleep(duration / steps)
 
     async def smooth_glide(self, start_y, end_y, duration):
         """
         Smooth linear scroll to cover ground.
         """
-        steps = int(duration * 60) # 60fps
+        # PERFORMANCE FIX: 10 FPS for Scrolling
+        fps = 10 
+        steps = int(duration * fps)
         if steps == 0: return
 
         dist = end_y - start_y
@@ -90,30 +96,25 @@ class VelocityInput:
              await self.frame.evaluate(f"window.scrollTo(0, {current_y})")
              
              # Gentle mouse sway
-             sway = math.sin(i * 0.1) * 20
-             await self.page.mouse.move(self.mouse_x + sway, self.mouse_y)
+             # Only update mouse every 2nd frame to save calls
+             if i % 2 == 0:
+                 sway = math.sin(i * 0.1) * 20
+                 await self.page.mouse.move(self.mouse_x + sway, self.mouse_y)
              
              await asyncio.sleep(duration / steps)
         
         await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
 
 
-async def analyze_and_choreograph(page, frame, input_sys):
+async def choreography_script(page, frame, input_sys):
     print(">> AI Director: 30s Full Page Scan...")
     
     # 1. GET KEY METRICS
     total_height = await frame.evaluate("document.body.scrollHeight")
     viewport_h = await frame.evaluate("window.innerHeight")
-    
-    # We need to reach (total_height - viewport_h)
     max_scroll = total_height - viewport_h
     
-    # 2. THE TIMELINE (30s)
-    # 0-5s: Hero Interaction
-    # 5-25s: The Glide (Cover 100% of height)
-    # 25-30s: Footer Interaction
-    
-    # --- ACT 1: HERO (5s) ---
+    # --- ACT 1: HERO (4s) ---
     print(">> Act 1: Hero")
     
     # Find Hero element
@@ -125,23 +126,21 @@ async def analyze_and_choreograph(page, frame, input_sys):
     
     # Move to center
     await input_sys.human_move(hero_center['x'], hero_center['y'], speed="slow")
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.5)
     
     # Interaction: Circle?
     cx, cy = input_sys.mouse_x, input_sys.mouse_y
-    for i in range(30):
-        a = i * 0.3
+    # Reduced circle steps
+    for i in range(10):
+        a = i * 0.6
         r = 30
         await page.mouse.move(cx + math.cos(a)*r, cy + math.sin(a)*r)
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(0.05) # 50ms wait
         
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.5)
     
     # --- ACT 2: THE GLIDE (20s) ---
     print(">> Act 2: Full Page Glide")
-    
-    # We want to scroll from 0 to max_scroll in 20 seconds.
-    # But we want to pause briefly at "Projects" if found.
     
     start_y = 0
     # Find 'Projects' Y
@@ -152,22 +151,20 @@ async def analyze_and_choreograph(page, frame, input_sys):
     
     if projects_y:
         # Split Glide: Hero -> Projects -> End
-        # Segment 1: Hero -> Projects
         dist1 = projects_y - start_y
-        time1 = 6.0 # 6s to get to projects
+        time1 = 6.0 
         
         await input_sys.smooth_glide(start_y, projects_y, duration=time1)
         start_y = projects_y
         
-        # Pause at Projects (2s)
+        # Pause at Projects (1.5s)
         print("   > Pausing at Projects")
-        # Visual scan
         await input_sys.human_move(500, 800, speed="fast")
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(1.0)
         
         # Segment 2: Projects -> End
         dist2 = max_scroll - projects_y
-        time2 = 12.0 # 12s remaining for rest
+        time2 = 12.0 
         await input_sys.smooth_glide(start_y, max_scroll, duration=time2)
         
     else:
@@ -193,7 +190,6 @@ async def analyze_and_choreograph(page, frame, input_sys):
         await input_sys.human_move(cta_pos['x'], cta_pos['y'], speed="normal")
         # Hover/Wiggle
         await asyncio.sleep(0.5)
-        await input_sys.human_move(cta_pos['x']+10, cta_pos['y']+5, speed="slow")
         
     await asyncio.sleep(2.0) # Final freeze frame
 
@@ -213,7 +209,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             args=['--enable-features=OverlayScrollbar', '--no-sandbox', '--disable-web-security']
         )
         
-        # Standard Presentation Viewport
         context = await browser.new_context(
             viewport={"width": 1080, "height": 1920},
             device_scale_factor=1.0,
@@ -225,7 +220,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         
         # --- UI CONSTANTS ---
         VIRTUAL_W = 1024 
-        # Maximize vertically
         CONTAINER_H = 1550 
         CONTAINER_W = 1000
         SCALE_FACTOR = CONTAINER_W / VIRTUAL_W
@@ -256,114 +250,31 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
                     justify-content: space-between;
                     padding-bottom: 40px;
                 }}
-                
-                @keyframes gradientBG {{
-                    0% {{ background-position: 0% 50%; }}
-                    50% {{ background-position: 100% 50%; }}
-                    100% {{ background-position: 0% 50%; }}
-                }}
-                
-                /* HEADER */
-                #header-group {{
-                    margin-top: 50px;
-                    display: flex; flex-direction: column; align-items: center;
-                    z-index: 10; height: 140px; flex-shrink: 0;
-                }}
+                @keyframes gradientBG {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
+                #header-group {{ margin-top: 50px; display: flex; flex-direction: column; align-items: center; z-index: 10; height: 140px; flex-shrink: 0; }}
                 #p-header {{ font-size: 30px; font-weight: 700; letter-spacing: 4px; color: #888; text-transform: uppercase; }}
-                #p-title {{
-                    font-size: 50px; font-weight: 900; text-align: center;
-                    background: linear-gradient(135deg, #fff 0%, #aaa 100%);
-                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                    margin-top: 10px; line-height: 1.1; max-width: 900px;
-                }}
-                
-                /* PRESENTATION WINDOW */
-                #presentation-window {{
-                    position: relative;
-                    width: {CONTAINER_W}px; height: {CONTAINER_H}px;
-                    background: #fff;
-                    box-shadow: 0 0 0 1px rgba(0,0,0, 0.8), 0 30px 80px rgba(0,0,0, 0.7), 0 0 150px rgba(0,0,0, 0.9);
-                    overflow: hidden; border-radius: 12px;
-                    border: 4px solid rgba(255, 255, 255, 0.1);
-                    display: flex; flex-direction: column;
-                }}
-                
-                #browser-header {{
-                    height: 40px; background: #f0f0f0; border-bottom: 1px solid #ddd;
-                    display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0;
-                }}
+                #p-title {{ font-size: 50px; font-weight: 900; text-align: center; background: linear-gradient(135deg, #fff 0%, #aaa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 10px; line-height: 1.1; max-width: 900px; }}
+                #presentation-window {{ position: relative; width: {CONTAINER_W}px; height: {CONTAINER_H}px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0, 0.8), 0 30px 80px rgba(0,0,0, 0.7), 0 0 150px rgba(0,0,0, 0.9); overflow: hidden; border-radius: 12px; border: 4px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; }}
+                #browser-header {{ height: 40px; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0; }}
                 .browser-dot {{ width: 12px; height: 12px; border-radius: 50%; }}
-                .dot-red {{ background: #ff5f56; }}
-                .dot-yellow {{ background: #ffbd2e; }}
-                .dot-green {{ background: #27c93f; }}
+                .dot-red {{ background: #ff5f56; }} .dot-yellow {{ background: #ffbd2e; }} .dot-green {{ background: #27c93f; }}
                 .browser-bar {{ flex-grow: 1; height: 24px; background: #fff; border-radius: 4px; margin-left: 10px; border: 1px solid #e0e0e0; }}
-                
-                #content-iframe {{
-                    width: {VIRTUAL_W}px;
-                    height: {int((CONTAINER_H - 40) / SCALE_FACTOR)}px;
-                    border: none; background: #fff;
-                    transform: scale({SCALE_FACTOR}); transform-origin: top left; display: block;
-                }}
-                
-                /* FOOTER */
-                #footer-group {{
-                    margin-bottom: 90px; display: flex; flex-direction: column;
-                    align-items: center; gap: 15px; z-index: 10; height: 200px; justify-content: flex-end;
-                }}
-                 .cta-button {{
-                    background: #fff; color: #000; padding: 25px 80px;
-                    border-radius: 4px; font-weight: 900; font-size: 45px;
-                    text-transform: uppercase; letter-spacing: 2px;
-                    box-shadow: 0 10px 40px rgba(255, 255, 255, 0.2);
-                    animation: pulse-glow 3s infinite ease-in-out;
-                }}
+                #content-iframe {{ width: {VIRTUAL_W}px; height: {int((CONTAINER_H - 40) / SCALE_FACTOR)}px; border: none; background: #fff; transform: scale({SCALE_FACTOR}); transform-origin: top left; display: block; }}
+                #footer-group {{ margin-bottom: 90px; display: flex; flex-direction: column; align-items: center; gap: 15px; z-index: 10; height: 200px; justify-content: flex-end; }}
+                .cta-button {{ background: #fff; color: #000; padding: 25px 80px; border-radius: 4px; font-weight: 900; font-size: 45px; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 10px 40px rgba(255, 255, 255, 0.2); animation: pulse-glow 3s infinite ease-in-out; }}
                 .cta-subtext {{ font-size: 26px; color: #666; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }}
-                @keyframes pulse-glow {{
-                    0% {{ transform: scale(1); }}
-                    50% {{ transform: scale(1.02); box-shadow: 0 10px 60px rgba(255, 255, 255, 0.4); }}
-                    100% {{ transform: scale(1); }}
-                }}
-                
-                #ai-cursor {{
-                    position: absolute; top: 0; left: 0; width: 30px; height: 30px;
-                    background: #ffffff; border: 2px solid rgba(0, 0, 0, 0.1);
-                    border-radius: 50%; pointer-events: none; z-index: 9999;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                    transition: transform 0.1s, background 0.2s, opacity 0.3s; opacity: 0;
-                }}
+                @keyframes pulse-glow {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.02); box-shadow: 0 10px 60px rgba(255, 255, 255, 0.4); }} 100% {{ transform: scale(1); }} }}
+                #ai-cursor {{ position: absolute; top: 0; left: 0; width: 30px; height: 30px; background: #ffffff; border: 2px solid rgba(0, 0, 0, 0.1); border-radius: 50%; pointer-events: none; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.4); transition: transform 0.1s, background 0.2s, opacity 0.3s; opacity: 0; }}
             </style>
         </head>
         <body>
-            <div id="header-group">
-                <div id="p-header">{header_txt}</div>
-                <div id="p-title">{title_txt}</div>
-            </div>
-            
-            <div id="presentation-window">
-                <div id="browser-header">
-                    <div class="browser-dot dot-red"></div>
-                    <div class="browser-dot dot-yellow"></div>
-                    <div class="browser-dot dot-green"></div>
-                    <div class="browser-bar"></div>
-                </div>
-                <iframe id="content-iframe" src="{target_url}" scrolling="yes"></iframe>
-            </div>
-            
-            <div id="footer-group">
-                <div class="cta-button">{cta_txt}</div>
-                <div class="cta-subtext">{sub_txt}</div>
-            </div>
-            
+            <div id="header-group"><div id="p-header">{header_txt}</div><div id="p-title">{title_txt}</div></div>
+            <div id="presentation-window"><div id="browser-header"><div class="browser-dot dot-red"></div><div class="browser-dot dot-yellow"></div><div class="browser-dot dot-green"></div><div class="browser-bar"></div></div><iframe id="content-iframe" src="{target_url}" scrolling="yes"></iframe></div>
+            <div id="footer-group"><div class="cta-button">{cta_txt}</div><div class="cta-subtext">{sub_txt}</div></div>
             <div id="ai-cursor"></div>
-            
             <script>
-                const c = document.getElementById('ai-cursor');
-                let isVisible = false;
-                document.addEventListener('mousemove', e => {{
-                    if (!isVisible) {{ c.style.opacity = '1'; isVisible = true; }}
-                    c.style.left = e.clientX + 'px';
-                    c.style.top = e.clientY + 'px';
-                }});
+                const c = document.getElementById('ai-cursor'); let isVisible = false;
+                document.addEventListener('mousemove', e => {{ if(!isVisible){{c.style.opacity='1';isVisible=true;}} c.style.left=e.clientX+'px'; c.style.top=e.clientY+'px'; }});
             </script>
         </body>
         </html>
@@ -378,9 +289,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             await page.wait_for_timeout(2000)
             content_frame = await iframe_element.content_frame()
             
-        if not content_frame:
-            print("Error: Could not access content iframe.")
-            return
+        if not content_frame: return
 
         try:
             await content_frame.wait_for_load_state("networkidle")
@@ -390,10 +299,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         print("Iframe Loaded. Starting Action.")
         
         # Hide Scrollbars
-        await content_frame.add_style_tag(content="""
-            ::-webkit-scrollbar { display: none; }
-            body { -ms-overflow-style: none; scrollbar-width: none; }
-        """)
+        await content_frame.add_style_tag(content="::-webkit-scrollbar { display: none; } body { -ms-overflow-style: none; scrollbar-width: none; }")
 
         # Get Wrapper Offset for Mapping
         wrapper_offset = await page.evaluate("""() => {
@@ -408,8 +314,13 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
-        # Fixed 30s logic
-        await analyze_and_choreograph(page, content_frame, inputs)
+        # PERFORMANCE FIX: GLOBAL TIMEOUT
+        # We enforce a hard 32s limit on the choreography.
+        # This prevents loop lag from dragging it to 3 minutes.
+        try:
+            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=32.0)
+        except asyncio.TimeoutError:
+            print("(!) TIMEOUT: Forced video end at 32s safety limit.")
                 
         # Save
         video = page.video
