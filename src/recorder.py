@@ -57,7 +57,6 @@ class VelocityInput:
         self.mouse_x, self.mouse_y = vx, vy
 
     async def _bezier_curve(self, sx, sy, ex, ey, duration):
-        # Time-Locked Bezier
         start_time = time.time()
         
         offset_strength = random.randint(-40, 40)
@@ -77,109 +76,155 @@ class VelocityInput:
             # SMOOTH 30 FPS
             await asyncio.sleep(0.033) 
 
-    async def smooth_glide(self, start_y, end_y, duration):
+    async def interactive_glide(self, start_y, end_y, nominal_duration, interactables=[]):
         """
-        Time-Locked Linear Glide @ 30 FPS
+        Scrolls from start_y to end_y.
+        If an 'interactable' comes into view, we PAUSE scroll, interact, then RESUME.
+        The 'nominal_duration' is the time spent scrolling (excluding pauses).
         """
         start_time = time.time()
+        paused_duration = 0
+        
+        # Sort targets by Y position
+        pending_targets = sorted(interactables, key=lambda i: i['y'])
+        
+        # To avoid getting stuck, we remove targets effectively passed
         
         while True:
             now = time.time()
-            elapsed = now - start_time
+            # Net elapsed time spent actually scrolling
+            scroll_elapsed = (now - start_time) - paused_duration
             
-            if elapsed >= duration:
+            if scroll_elapsed >= nominal_duration:
                 break
             
-            progress = elapsed / duration
-            
-            # Linear Interpolation
+            progress = scroll_elapsed / nominal_duration
             current_y = start_y + (end_y - start_y) * progress
             
             await self.frame.evaluate(f"window.scrollTo(0, {current_y})")
             
+            # --- INTERACTION CHECK ---
+            # Check if any target is roughly in the "Golden Zone" (middle of screen)
+            # Viewport center in Doc coords = current_y + 960/2 (approx 480) ?? 
+            # Viewport height is ~900 in frame units? Let's check window innerHeight
+            
+            # Simple heuristic: If we are close to target Y - 500
+            
+            if pending_targets:
+                next_t = pending_targets[0]
+                # Target Y is absolute document Y.
+                # If target is within [current_y + 200, current_y + 600] (visible area)
+                
+                # We trigger interaction when it's comfortably in view
+                trigger_y = next_t['y'] - 500 
+                
+                if current_y > trigger_y:
+                    # TIME TO INTERACT!
+                    print(f"   > Spotted Interest: {next_t['tag']}")
+                    
+                    # 1. Pause Clock
+                    pause_start = time.time()
+                    
+                    # 2. Move & Hover
+                    # Convert absolute doc Y to local frame relative Y for mouse
+                    # Frame Y = Doc Y - current_y
+                    frame_target_y = next_t['y'] - current_y
+                    frame_target_x = next_t['x']
+                    
+                    # Only move if it's actually on screen
+                    if 0 < frame_target_y < 1500: # Safety bounds
+                        await self.human_move(frame_target_x, frame_target_y, speed="normal")
+                        
+                        # HOVER EFFECT (Wiggle)
+                        await asyncio.sleep(0.2)
+                        await self.human_move(frame_target_x + 20, frame_target_y + 10, speed="slow", overshoot=False)
+                        await asyncio.sleep(0.4)
+                        
+                        # Move away slightly to un-hover? Or just leave it.
+                        
+                    # 3. Resume
+                    paused_duration += (time.time() - pause_start)
+                    pending_targets.pop(0) # Done with this one
+            
+            # --- END INTERACTION CHECK ---
+            
             # Mouse Sway
-            if random.random() < 0.3:
-                 sway = math.sin(elapsed * 1.5) * 15
+            if random.random() < 0.2:
+                 sway = math.sin(scroll_elapsed * 1.5) * 15
                  await self.page.mouse.move(self.mouse_x + sway, self.mouse_y)
             
-            # SMOOTH 30 FPS
             await asyncio.sleep(0.033)
         
-        # Ensure final snap
         await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
 
 
 async def choreography_script(page, frame, input_sys):
-    print(">> AI Director: 45s Full Page Scan (Smooth)...")
+    print(">> AI Director: 55s Interactive Exploration...")
     
-    # 1. GET KEY METRICS
+    # 1. SCAN FOR INTERACTABLES
+    # We look for "Juicy" elements: Buttons, Cards, Images
+    interactables = await frame.evaluate("""() => {
+        const candidates = document.querySelectorAll('button, a.btn, .card, .project-item, img, h2');
+        const results = [];
+        candidates.forEach(el => {
+            const r = el.getBoundingClientRect();
+            if(r.height < 50 || r.width < 50) return; // Skip tiny icons
+            
+            results.push({
+                tag: el.tagName,
+                x: r.left + r.width/2,
+                y: r.top + window.scrollY + r.height/2 // Abs Y
+            });
+        });
+        // Sort by Y
+        return results.sort((a,b) => a.y - b.y);
+    }""")
+    
+    # Filter: Limit to max 4 interactions to avoid stopping every 2 seconds
+    # We pick them spaced out
+    final_interactables = []
+    if interactables:
+        step = max(1, len(interactables) // 4)
+        for i in range(0, len(interactables), step):
+            if len(final_interactables) < 4:
+                final_interactables.append(interactables[i])
+    
+    print(f">> Identified {len(final_interactables)} Interactive Targets.")
+    
     total_height = await frame.evaluate("document.body.scrollHeight")
     viewport_h = await frame.evaluate("window.innerHeight")
     max_scroll = total_height - viewport_h
     
     # --- ACT 1: HERO (5s) ---
     print(">> Act 1: Hero")
-    
-    # Find Hero element
     hero_center = await frame.evaluate("""() => {
         const h = document.querySelector('section, header');
         const r = h.getBoundingClientRect();
         return {x: r.left + r.width/2, y: r.top + r.height/2};
     }""")
-    
-    # Move to center
     await input_sys.human_move(hero_center['x'], hero_center['y'], speed="slow")
     await asyncio.sleep(1.0)
     
-    # Interaction: Circle
     cx, cy = input_sys.mouse_x, input_sys.mouse_y
     for i in range(20):
         a = i * 0.4
         r = 30
         await page.mouse.move(cx + math.cos(a)*r, cy + math.sin(a)*r)
         await asyncio.sleep(0.033)
-        
     await asyncio.sleep(0.5)
     
-    # --- ACT 2: THE GLIDE (30s) ---
-    # Extended duration for smoother reading
-    print(">> Act 2: Full Page Glide")
+    # --- ACT 2: INTERACTIVE GLIDE (45s base) ---
+    print(">> Act 2: Interactive Glide")
     
-    start_y = 0
-    # Find 'Projects' Y
-    projects_y = await frame.evaluate("""() => {
-        const el = document.getElementById('projects') || document.querySelector('.projects');
-        return el ? el.offsetTop : null;
-    }""")
+    # The glide will take ~35s-40s of SCROLL time, plus pauses.
+    # We use 'interactive_glide' to handle the pauses.
     
-    if projects_y:
-        # Split Glide: Hero -> Projects -> End
-        # 8s to reach Projects
-        time1 = 8.0 
-        await input_sys.smooth_glide(start_y, projects_y, duration=time1)
-        start_y = projects_y
-        
-        # Pause at Projects (2s)
-        print("   > Pausing at Projects")
-        await input_sys.human_move(500, 800, speed="fast")
-        await asyncio.sleep(2.0)
-        
-        # Segment 2: Projects -> End
-        # 20s for the remaining content (plenty of time)
-        time2 = 20.0 
-        await input_sys.smooth_glide(start_y, max_scroll, duration=time2)
-        
-    else:
-        # No specific middle target, just Glide all way (30s)
-        await input_sys.smooth_glide(0, max_scroll, duration=30.0)
-    
-    # --- ACT 3: FOOTER (End) ---
+    await input_sys.interactive_glide(0, max_scroll, nominal_duration=40.0, interactables=final_interactables)
+
+    # --- ACT 3: FOOTER (5s) ---
     print(">> Act 3: Footer/Contact")
-    
-    # Ensure fully at bottom
     await frame.evaluate(f"window.scrollTo(0, {total_height})")
     
-    # Find CTA Button
     cta_pos = await frame.evaluate("""() => {
         const b = document.querySelector('.submit-btn, button[type="submit"], .footer-link');
         if(!b) return null;
@@ -188,12 +233,10 @@ async def choreography_script(page, frame, input_sys):
     }""")
     
     if cta_pos:
-        # Move to CTA
         await input_sys.human_move(cta_pos['x'], cta_pos['y'], speed="normal")
-        # Hover
         await asyncio.sleep(1.0)
         
-    await asyncio.sleep(3.0) # Final freeze frame
+    await asyncio.sleep(3.0) 
 
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
@@ -310,9 +353,9 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
-        # TIMEOUT: 48s Hard Limit (Buffer for 45s logic)
+        # TIMEOUT: 70s Hard Limit (Buffer for 55s logic)
         try:
-            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=48.0)
+            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=70.0)
         except asyncio.TimeoutError:
             print("(!) TIMEOUT: Safety limit hit.")
                 
@@ -335,4 +378,4 @@ if __name__ == "__main__":
     run_server_in_thread()
     time.sleep(1)
     test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
-    asyncio.run(record_url(test_html, 45, "test_output.mp4"))
+    asyncio.run(record_url(test_html, 55, "test_output.mp4"))
