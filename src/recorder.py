@@ -165,30 +165,64 @@ class HumanScroller:
     async def reading_behavior(self, duration):
         """
         Simulates a human pausing to read/look at content.
-        - Mouse drifts slowly across the visible area
-        - Occasional micro-scrolls (tiny movements)
+        - Finds interactive elements in viewport and hovers over them
+        - Triggers micro-interactions (hover effects)
         """
         start_time = time.time()
-        start_scroll_y = self.scroll_y
         
+        # Find interactive elements currently visible in viewport
+        visible_elements = await self.frame.evaluate("""() => {
+            const elements = document.querySelectorAll('button, a, .card, .project-item, img, h2, h3');
+            const results = [];
+            elements.forEach(el => {
+                const r = el.getBoundingClientRect();
+                // Check if in viewport (visible area)
+                if(r.top > 50 && r.top < 800 && r.width > 50 && r.height > 30) {
+                    results.push({
+                        x: r.left + r.width/2,
+                        y: r.top + r.height/2,
+                        tag: el.tagName
+                    });
+                }
+            });
+            return results.slice(0, 3); // Max 3 elements
+        }""")
+        
+        # Hover over each element briefly
+        for el in visible_elements:
+            if time.time() - start_time >= duration:
+                break
+                
+            # Move to element
+            vx, vy = self.frame_to_viewport(el['x'], el['y'])
+            
+            # Smooth approach
+            steps = 15
+            start_x, start_y = self.mouse_x, self.mouse_y
+            for i in range(steps):
+                t = (i + 1) / steps
+                eased_t = ease_in_out_cubic(t)
+                self.mouse_x = start_x + (vx - start_x) * eased_t
+                self.mouse_y = start_y + (vy - start_y) * eased_t
+                await self.page.mouse.move(self.mouse_x, self.mouse_y)
+                await asyncio.sleep(self.DT)
+            
+            # Hover wiggle (triggers micro-interaction)
+            for _ in range(8):
+                wiggle_x = vx + random.uniform(-5, 5)
+                wiggle_y = vy + random.uniform(-3, 3)
+                await self.page.mouse.move(wiggle_x, wiggle_y)
+                await asyncio.sleep(0.05)
+            
+            # Brief pause to let animation play
+            await asyncio.sleep(0.3)
+        
+        # Fill remaining time with gentle drift
         while time.time() - start_time < duration:
             elapsed = time.time() - start_time
-            
-            # Slow drift pattern
-            drift_x = math.sin(elapsed * 0.8) * 80
-            drift_y = math.sin(elapsed * 0.5 + 0.7) * 40
-            
-            self.mouse_x = 540 + drift_x
-            self.mouse_y = 800 + drift_y
-            
-            await self.page.mouse.move(self.mouse_x, self.mouse_y)
-            
-            # Occasional micro-scroll (human "settling")
-            if random.random() < 0.05:
-                micro = random.uniform(-5, 5)
-                self.scroll_y = start_scroll_y + micro
-                await self.frame.evaluate(f"window.scrollTo(0, {self.scroll_y})")
-            
+            drift_x = math.sin(elapsed * 0.8) * 30
+            drift_y = math.sin(elapsed * 0.5) * 20
+            await self.page.mouse.move(540 + drift_x, 800 + drift_y)
             await asyncio.sleep(self.DT)
 
 
