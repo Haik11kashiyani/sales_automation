@@ -9,18 +9,30 @@ import random
 import math
 
 # --- Helper to start a local server for the content ---
-PORT = 8000
 SERVER_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../")) 
+SERVER_PORT = 0 # Will be assigned dynamically
+SERVER_READY = threading.Event()
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+class ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
 def start_server():
-    os.chdir(SERVER_ROOT)
-    with socketserver.TCPServer(("", PORT), QuietHandler) as httpd:
-        print(f"Serving at port {PORT}")
-        httpd.serve_forever()
+    global SERVER_PORT
+    try:
+        os.chdir(SERVER_ROOT)
+        # Use Port 0 to let OS assign a free port
+        with ReusableTCPServer(("", 0), QuietHandler) as httpd:
+            SERVER_PORT = httpd.server_address[1]
+            print(f"Serving at port {SERVER_PORT}")
+            SERVER_READY.set()
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"Server Error: {e}")
+        SERVER_READY.set() # Unblock main thread even on error
 
 def run_server_in_thread():
     t = threading.Thread(target=start_server)
@@ -40,17 +52,14 @@ class AttentionInput:
         self.wrapper_offset = wrapper_offset
         self.scale_factor = scale_factor
         
-        # State
         self.mouse_x = 540
         self.mouse_y = 960
         self.scroll_y = 0
         self.scroll_velocity = 0
         
-        # Physics Constants
         self.FPS = 30
         self.DT = 1.0 / self.FPS
         
-        # Attention
         self.targets = []
         self.current_focus = None
         self.focus_start_time = 0
@@ -61,110 +70,61 @@ class AttentionInput:
         return vx, vy
 
     async def update_physics(self):
-        """
-        One tick of the simulation.
-        """
-        # 1. Update Scroll
         self.scroll_y += self.scroll_velocity
         await self.frame.evaluate(f"window.scrollTo(0, {self.scroll_y})")
-        
-        # 2. Update Mouse Logic (The "Brain")
-        # Is there a target passing through our "Attention Zone"?
-        # Zone: Middle of screen (Y=600 to Y=1200 in frame coords)
         
         attention_pull = (0, 0)
         drag_factor = 1.0
         
-        # Find best candidate
         best_target = None
         min_dist = 9999
         
         for t in self.targets:
-            # Target Frame Y depends on Scroll
             tfy = t['y'] - self.scroll_y
             tfx = t['x']
-            
-            # Distance to Mouse
-            dx = tfx - self.mouse_x # Mouse X is viewport-ish, need mapping?
-            # Actually mouse_x is Viewport X. We need to map target to Viewport.
             tvx, tvy = self.frame_to_viewport(tfx, tfy)
-            
-            # Is it on screen?
             if 100 < tvy < 1400: # Visible zone
                 dist = math.hypot(tvx - self.mouse_x, tvy - self.mouse_y)
                 if dist < min_dist:
                     min_dist = dist
                     best_target = (tvx, tvy, t)
 
-        # State Machine
         if best_target:
             tvx, tvy, t_data = best_target
-            
-            # "Notice" Threshold
-            # If we are scrolling past it, we might notice it.
-            if min_dist < 400 and random.random() < 0.1: # 10% chance per frame to notice
+            if min_dist < 400 and random.random() < 0.1:
                 if self.current_focus != t_data:
                     self.current_focus = t_data
                     self.focus_start_time = time.time()
-                    # print(f"   > Noticed: {t_data['tag']}")
         
-        # Apply Attention Forces
         if self.current_focus:
-            # How long have we been looking?
             focus_duration = time.time() - self.focus_start_time
-            
             tvx, tvy = self.frame_to_viewport(self.current_focus['x'], self.current_focus['y'] - self.scroll_y)
             
-            # Phase 1: Approach (0 - 0.5s)
             if focus_duration < 0.6:
-                # Pull mouse to target
                 dx = tvx - self.mouse_x
                 dy = tvy - self.mouse_y
-                
-                # Gravity
-                self.mouse_x += dx * 0.1 # 10% closing per frame
+                self.mouse_x += dx * 0.1 
                 self.mouse_y += dy * 0.1
-                
-                # Slow scroll
                 drag_factor = 0.90 
-
-            # Phase 2: Examine (0.5s - 1.5s)
             elif focus_duration < 1.5:
-                # Hover/Wiggle
                 self.mouse_x = tvx + math.sin(focus_duration * 10) * 5
                 self.mouse_y = tvy + math.cos(focus_duration * 8) * 5
-                
-                # Stop scroll almost
                 drag_factor = 0.5
-
-            # Phase 3: Release (> 1.5s)
             else:
-                self.current_focus = None # Bored now
+                self.current_focus = None
         else:
-            # Idle Sway
             self.mouse_x += random.uniform(-1, 1)
             self.mouse_y += math.sin(time.time()) * 0.5
 
-        # Apply Scroll Friction/Drag
         self.scroll_velocity *= drag_factor
-        
-        # Apply Mouse Position
         await self.page.mouse.move(self.mouse_x, self.mouse_y)
 
 
     async def fluid_glide(self, start_y, end_y, max_duration):
-        """
-        Scrolls with fluid attention.
-        """
         self.scroll_y = start_y
         start_time = time.time()
-        
-        # Base Velocity needed to cover distance
         dist = end_y - start_y
-        # We assume we want to finish roughly in max_duration
-        # taking into account some slowdowns.
-        base_velocity = dist / (max_duration * 30) # pixels per frame
-        
+        base_velocity = dist / (max_duration * 30)
         self.scroll_velocity = base_velocity
         
         while True:
@@ -172,9 +132,7 @@ class AttentionInput:
             if elapsed > max_duration: break
             if self.scroll_y >= end_y - 10: break
             
-            # Cruise Control: Try to maintain base velocity if not distracted
             if self.current_focus is None:
-                # Accelerate back to base speed
                 if self.scroll_velocity < base_velocity:
                     self.scroll_velocity += 0.5
                 elif self.scroll_velocity > base_velocity:
@@ -183,14 +141,12 @@ class AttentionInput:
             await self.update_physics()
             await asyncio.sleep(self.DT)
         
-        # Snap end
         await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
 
 
 async def choreography_script(page, frame, input_sys):
     print(">> AI Director: Human Attention Scan...")
     
-    # 1. SCAN
     targets = await frame.evaluate("""() => {
         const candidates = document.querySelectorAll('button, a.btn, .card, .project-item, img, h2');
         const results = [];
@@ -206,11 +162,10 @@ async def choreography_script(page, frame, input_sys):
         return results.sort((a,b) => a.y - b.y);
     }""")
     
-    # Filter density (don't get distracted by EVERYTHING)
     filtered = []
     last_y = -999
     for t in targets:
-        if t['y'] - last_y > 400: # Min spacing
+        if t['y'] - last_y > 400: 
             filtered.append(t)
             last_y = t['y']
             
@@ -221,30 +176,26 @@ async def choreography_script(page, frame, input_sys):
     viewport_h = await frame.evaluate("window.innerHeight")
     max_scroll = total_height - viewport_h
     
-    # --- ACT 1: HERO (Warmup) ---
     print(">> Act 1: Hero")
     input_sys.scroll_y = 0
     await input_sys.page.mouse.move(540, 500)
-    for i in range(60): # 2s
+    for i in range(60): 
         await input_sys.update_physics()
         await asyncio.sleep(input_sys.DT)
         
-    # --- ACT 2: FLUID GLIDE (40s) ---
     print(">> Act 2: Fluid Glide")
-    # We give it a generous Max Duration so it can linger
     await input_sys.fluid_glide(0, max_scroll, max_duration=45.0)
 
-    # --- ACT 3: FOOTER ---
     print(">> Act 3: Footer Check")
-    # Just hold for a bit
-    for i in range(90): # 3s
+    for i in range(90): 
         await input_sys.update_physics()
         await asyncio.sleep(input_sys.DT)
 
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     rel_path = os.path.relpath(file_path, SERVER_ROOT)
-    target_url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
+    # Use Global SERVER_PORT
+    target_url = f"http://localhost:{SERVER_PORT}/{rel_path.replace(os.sep, '/')}"
     print(f"Recording URL: {target_url}")
 
     async with async_playwright() as p:
@@ -260,7 +211,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         )
         page = await context.new_page()
         
-        # UI
         VIRTUAL_W, CONTAINER_H, CONTAINER_W = 1024, 1550, 1000
         SCALE_FACTOR = CONTAINER_W / VIRTUAL_W
         header_txt = overlay_header.upper() or "WEB DESIGN AWARDS"
@@ -295,6 +245,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         </body></html>
         """
         await page.set_content(host_html)
+        
         iframe_element = await page.query_selector('#content-iframe')
         content_frame = await iframe_element.content_frame()
         if not content_frame: await page.wait_for_timeout(2000); content_frame = await iframe_element.content_frame()
@@ -323,7 +274,11 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             shutil.move(saved, output_path)
 
 if __name__ == "__main__":
-    run_server_in_thread()
-    time.sleep(1)
-    test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
-    asyncio.run(record_url(test_html, 55, "test_output.mp4"))
+    t = run_server_in_thread()
+    # Wait for server to be ready with port
+    if SERVER_READY.wait(timeout=5):
+        time.sleep(1) # Extra buffer
+        test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
+        asyncio.run(record_url(test_html, 55, "test_output.mp4"))
+    else:
+        print("Server Failed to start!")
