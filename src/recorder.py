@@ -50,71 +50,74 @@ class VelocityInput:
     async def human_move(self, target_fx, target_fy, speed="normal", overshoot=True):
         vx, vy = self.frame_to_viewport(target_fx, target_fy)
         dist = math.hypot(vx - self.mouse_x, vy - self.mouse_y)
-        # Faster Duration for Shorts
-        duration = 0.3 + (dist / 4000.0) 
-        if speed == "fast": duration *= 0.5
+        duration = 0.5 + (dist / 3000.0) 
+        if speed == "fast": duration *= 0.6
         
         await self._bezier_curve(self.mouse_x, self.mouse_y, vx, vy, duration)
         self.mouse_x, self.mouse_y = vx, vy
 
     async def _bezier_curve(self, sx, sy, ex, ey, duration):
-        # PERFORMANCE FIX: Reduce FPS from 60 to 12
-        # Reduce IPC overhead
-        fps = 12
-        steps = int(duration * fps)
-        if steps < 1: steps = 1
-
-        offset_strength = random.randint(-50, 50)
-        cx = (sx + ex) / 2 + random.randint(-20, 20)
+        # Time-Locked Bezier
+        start_time = time.time()
+        
+        offset_strength = random.randint(-40, 40)
+        cx = (sx + ex) / 2 + random.randint(-15, 15)
         cy = (sy + ey) / 2 + offset_strength
         
-        for i in range(steps + 1):
-            t = i / steps
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed >= duration: break
+            
+            t = elapsed / duration
             nt = 1 - t
             bx = (nt**2 * sx) + (2 * nt * t * cx) + (t**2 * ex)
             by = (nt**2 * sy) + (2 * nt * t * cy) + (t**2 * ey)
+            
             await self.page.mouse.move(bx, by)
-            # Sleep longer between frames -> less CPU burn
-            await asyncio.sleep(duration / steps)
+            # SMOOTH 30 FPS
+            await asyncio.sleep(0.033) 
 
     async def smooth_glide(self, start_y, end_y, duration):
         """
-        Smooth linear scroll to cover ground.
+        Time-Locked Linear Glide @ 30 FPS
         """
-        # PERFORMANCE FIX: 10 FPS for Scrolling
-        fps = 10 
-        steps = int(duration * fps)
-        if steps == 0: return
-
-        dist = end_y - start_y
-        step_size = dist / steps
+        start_time = time.time()
         
-        current_y = start_y
-        
-        for i in range(steps):
-             current_y += step_size
-             await self.frame.evaluate(f"window.scrollTo(0, {current_y})")
-             
-             # Gentle mouse sway
-             # Only update mouse every 2nd frame to save calls
-             if i % 2 == 0:
-                 sway = math.sin(i * 0.1) * 20
+        while True:
+            now = time.time()
+            elapsed = now - start_time
+            
+            if elapsed >= duration:
+                break
+            
+            progress = elapsed / duration
+            
+            # Linear Interpolation
+            current_y = start_y + (end_y - start_y) * progress
+            
+            await self.frame.evaluate(f"window.scrollTo(0, {current_y})")
+            
+            # Mouse Sway
+            if random.random() < 0.3:
+                 sway = math.sin(elapsed * 1.5) * 15
                  await self.page.mouse.move(self.mouse_x + sway, self.mouse_y)
-             
-             await asyncio.sleep(duration / steps)
+            
+            # SMOOTH 30 FPS
+            await asyncio.sleep(0.033)
         
+        # Ensure final snap
         await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
 
 
 async def choreography_script(page, frame, input_sys):
-    print(">> AI Director: 30s Full Page Scan...")
+    print(">> AI Director: 45s Full Page Scan (Smooth)...")
     
     # 1. GET KEY METRICS
     total_height = await frame.evaluate("document.body.scrollHeight")
     viewport_h = await frame.evaluate("window.innerHeight")
     max_scroll = total_height - viewport_h
     
-    # --- ACT 1: HERO (4s) ---
+    # --- ACT 1: HERO (5s) ---
     print(">> Act 1: Hero")
     
     # Find Hero element
@@ -126,20 +129,20 @@ async def choreography_script(page, frame, input_sys):
     
     # Move to center
     await input_sys.human_move(hero_center['x'], hero_center['y'], speed="slow")
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1.0)
     
-    # Interaction: Circle?
+    # Interaction: Circle
     cx, cy = input_sys.mouse_x, input_sys.mouse_y
-    # Reduced circle steps
-    for i in range(10):
-        a = i * 0.6
+    for i in range(20):
+        a = i * 0.4
         r = 30
         await page.mouse.move(cx + math.cos(a)*r, cy + math.sin(a)*r)
-        await asyncio.sleep(0.05) # 50ms wait
+        await asyncio.sleep(0.033)
         
     await asyncio.sleep(0.5)
     
-    # --- ACT 2: THE GLIDE (20s) ---
+    # --- ACT 2: THE GLIDE (30s) ---
+    # Extended duration for smoother reading
     print(">> Act 2: Full Page Glide")
     
     start_y = 0
@@ -151,30 +154,29 @@ async def choreography_script(page, frame, input_sys):
     
     if projects_y:
         # Split Glide: Hero -> Projects -> End
-        dist1 = projects_y - start_y
-        time1 = 6.0 
-        
+        # 8s to reach Projects
+        time1 = 8.0 
         await input_sys.smooth_glide(start_y, projects_y, duration=time1)
         start_y = projects_y
         
-        # Pause at Projects (1.5s)
+        # Pause at Projects (2s)
         print("   > Pausing at Projects")
         await input_sys.human_move(500, 800, speed="fast")
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(2.0)
         
         # Segment 2: Projects -> End
-        dist2 = max_scroll - projects_y
-        time2 = 12.0 
+        # 20s for the remaining content (plenty of time)
+        time2 = 20.0 
         await input_sys.smooth_glide(start_y, max_scroll, duration=time2)
         
     else:
-        # No specific middle target, just Glide all way (18s)
-        await input_sys.smooth_glide(0, max_scroll, duration=18.0)
+        # No specific middle target, just Glide all way (30s)
+        await input_sys.smooth_glide(0, max_scroll, duration=30.0)
     
     # --- ACT 3: FOOTER (End) ---
     print(">> Act 3: Footer/Contact")
     
-    # Ensure we are fully at bottom
+    # Ensure fully at bottom
     await frame.evaluate(f"window.scrollTo(0, {total_height})")
     
     # Find CTA Button
@@ -188,15 +190,15 @@ async def choreography_script(page, frame, input_sys):
     if cta_pos:
         # Move to CTA
         await input_sys.human_move(cta_pos['x'], cta_pos['y'], speed="normal")
-        # Hover/Wiggle
-        await asyncio.sleep(0.5)
+        # Hover
+        await asyncio.sleep(1.0)
         
-    await asyncio.sleep(2.0) # Final freeze frame
+    await asyncio.sleep(3.0) # Final freeze frame
 
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     """
-    Records a webpage interaction via localhost using an IFRAME logic.
+    Records a webpage interaction via localhost.
     """
     rel_path = os.path.relpath(file_path, SERVER_ROOT)
     target_url = f"http://localhost:{PORT}/{rel_path.replace(os.sep, '/')}"
@@ -224,7 +226,6 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         CONTAINER_W = 1000
         SCALE_FACTOR = CONTAINER_W / VIRTUAL_W
 
-        # Header/Footer Text Defaults
         header_txt = overlay_header.upper() if overlay_header else "WEB DESIGN AWARDS"
         title_txt = overlay_text.upper() if overlay_text else "FUTURE OF WEB"
         cta_txt = cta_text.upper() if cta_text else "VISIT WEBSITE"
@@ -298,31 +299,23 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             
         print("Iframe Loaded. Starting Action.")
         
-        # Hide Scrollbars
         await content_frame.add_style_tag(content="::-webkit-scrollbar { display: none; } body { -ms-overflow-style: none; scrollbar-width: none; }")
 
-        # Get Wrapper Offset for Mapping
         wrapper_offset = await page.evaluate("""() => {
             const rect = document.getElementById('presentation-window').getBoundingClientRect();
             return { x: rect.left, y: rect.top };
         }""")
         
-        # Init Physics
         inputs = VelocityInput(page, content_frame, wrapper_offset, SCALE_FACTOR)
-        
-        # Start Move
         await page.mouse.move(540, 960)
         
         # --- CHOREOGRAPHY ---
-        # PERFORMANCE FIX: GLOBAL TIMEOUT
-        # We enforce a hard 32s limit on the choreography.
-        # This prevents loop lag from dragging it to 3 minutes.
+        # TIMEOUT: 48s Hard Limit (Buffer for 45s logic)
         try:
-            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=32.0)
+            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=48.0)
         except asyncio.TimeoutError:
-            print("(!) TIMEOUT: Forced video end at 32s safety limit.")
+            print("(!) TIMEOUT: Safety limit hit.")
                 
-        # Save
         video = page.video
         await context.close() 
         
@@ -339,9 +332,7 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             print("Error: No video recorded.")
 
 if __name__ == "__main__":
-    # Test execution
     run_server_in_thread()
     time.sleep(1)
-    
     test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
-    asyncio.run(record_url(test_html, 30, "test_output.mp4"))
+    asyncio.run(record_url(test_html, 45, "test_output.mp4"))
