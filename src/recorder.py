@@ -41,11 +41,11 @@ def run_server_in_thread():
 
 # --- REFINED HUMAN SCROLLING ENGINE ---
 
-def ease_in_out_quad(t):
-    """Smooth acceleration and deceleration curve."""
+def ease_in_out_cubic(t):
+    """Gentler easing curve for slower, more natural scrolling."""
     if t < 0.5:
-        return 2 * t * t
-    return 1 - pow(-2 * t + 2, 2) / 2
+        return 4 * t * t * t
+    return 1 - pow(-2 * t + 2, 3) / 2
 
 class HumanScroller:
     """
@@ -113,7 +113,7 @@ class HumanScroller:
             
             # Eased progress
             t = elapsed / duration
-            eased_t = ease_in_out_quad(t)
+            eased_t = ease_in_out_cubic(t)
             
             # Current scroll position
             self.scroll_y = start_y + distance * eased_t
@@ -146,8 +146,8 @@ class HumanScroller:
         
         # Calculate time per segment
         num_segments = len(pause_points)
-        scroll_time_per_segment = (total_duration * 0.7) / num_segments # 70% scrolling
-        pause_time_per_point = (total_duration * 0.3) / max(1, num_segments - 1) # 30% pausing
+        scroll_time_per_segment = (total_duration * 0.85) / num_segments # 85% scrolling (slower)
+        pause_time_per_point = (total_duration * 0.15) / max(1, num_segments - 1) # 15% pausing
         
         for i, target_y in enumerate(pause_points):
             print(f"   > Scrolling to Y={int(target_y)}...")
