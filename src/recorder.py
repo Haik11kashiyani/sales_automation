@@ -10,7 +10,7 @@ import math
 
 # --- Helper to start a local server for the content ---
 SERVER_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../")) 
-SERVER_PORT = 0 # Will be assigned dynamically
+SERVER_PORT = 0
 SERVER_READY = threading.Event()
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -24,7 +24,6 @@ def start_server():
     global SERVER_PORT
     try:
         os.chdir(SERVER_ROOT)
-        # Use Port 0 to let OS assign a free port
         with ReusableTCPServer(("", 0), QuietHandler) as httpd:
             SERVER_PORT = httpd.server_address[1]
             print(f"Serving at port {SERVER_PORT}")
@@ -32,7 +31,7 @@ def start_server():
             httpd.serve_forever()
     except Exception as e:
         print(f"Server Error: {e}")
-        SERVER_READY.set() # Unblock main thread even on error
+        SERVER_READY.set()
 
 def run_server_in_thread():
     t = threading.Thread(target=start_server)
@@ -40,11 +39,21 @@ def run_server_in_thread():
     t.start()
     return t
 
-# --- HUMAN ATTENTION ENGINE ---
+# --- REFINED HUMAN SCROLLING ENGINE ---
 
-class AttentionInput:
+def ease_in_out_quad(t):
+    """Smooth acceleration and deceleration curve."""
+    if t < 0.5:
+        return 2 * t * t
+    return 1 - pow(-2 * t + 2, 2) / 2
+
+class HumanScroller:
     """
-    Simulates a human eye-hand coordination system with attention 'gravity'.
+    Simulates natural, human-like scrolling with organic mouse movements.
+    Key improvements:
+    - Uses easing curves instead of linear velocity
+    - Implements continuous flow with subtle speed variations
+    - Never truly "stops" - always has micro-movement
     """
     def __init__(self, page, frame, wrapper_offset, scale_factor):
         self.page = page
@@ -52,149 +61,179 @@ class AttentionInput:
         self.wrapper_offset = wrapper_offset
         self.scale_factor = scale_factor
         
+        # State
         self.mouse_x = 540
-        self.mouse_y = 960
+        self.mouse_y = 800
         self.scroll_y = 0
-        self.scroll_velocity = 0
         
+        # Timing
         self.FPS = 30
         self.DT = 1.0 / self.FPS
         
-        self.targets = []
-        self.current_focus = None
-        self.focus_start_time = 0
+        # Organic variation seeds
+        self.time_offset = random.random() * 1000
 
     def frame_to_viewport(self, fx, fy):
         vx = self.wrapper_offset['x'] + (fx * self.scale_factor)
         vy = self.wrapper_offset['y'] + (fy * self.scale_factor)
         return vx, vy
 
-    async def update_physics(self):
-        self.scroll_y += self.scroll_velocity
-        await self.frame.evaluate(f"window.scrollTo(0, {self.scroll_y})")
+    async def organic_mouse_update(self, elapsed):
+        """
+        Creates natural, flowing mouse movement.
+        Uses layered sine waves for organic sway.
+        """
+        # Primary sway
+        sway_x = math.sin(elapsed * 0.3 + self.time_offset) * 15
+        sway_y = math.sin(elapsed * 0.5 + self.time_offset * 0.7) * 10
         
-        attention_pull = (0, 0)
-        drag_factor = 1.0
+        # Secondary micro-jitter (subtle)
+        jitter_x = random.gauss(0, 0.5)
+        jitter_y = random.gauss(0, 0.5)
         
-        best_target = None
-        min_dist = 9999
+        # Apply
+        self.mouse_x = 540 + sway_x + jitter_x
+        self.mouse_y = 800 + sway_y + jitter_y
         
-        for t in self.targets:
-            tfy = t['y'] - self.scroll_y
-            tfx = t['x']
-            tvx, tvy = self.frame_to_viewport(tfx, tfy)
-            if 100 < tvy < 1400: # Visible zone
-                dist = math.hypot(tvx - self.mouse_x, tvy - self.mouse_y)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_target = (tvx, tvy, t)
-
-        if best_target:
-            tvx, tvy, t_data = best_target
-            if min_dist < 400 and random.random() < 0.1:
-                if self.current_focus != t_data:
-                    self.current_focus = t_data
-                    self.focus_start_time = time.time()
-        
-        if self.current_focus:
-            focus_duration = time.time() - self.focus_start_time
-            tvx, tvy = self.frame_to_viewport(self.current_focus['x'], self.current_focus['y'] - self.scroll_y)
-            
-            if focus_duration < 0.6:
-                dx = tvx - self.mouse_x
-                dy = tvy - self.mouse_y
-                self.mouse_x += dx * 0.1 
-                self.mouse_y += dy * 0.1
-                drag_factor = 0.90 
-            elif focus_duration < 1.5:
-                self.mouse_x = tvx + math.sin(focus_duration * 10) * 5
-                self.mouse_y = tvy + math.cos(focus_duration * 8) * 5
-                drag_factor = 0.5
-            else:
-                self.current_focus = None
-        else:
-            self.mouse_x += random.uniform(-1, 1)
-            self.mouse_y += math.sin(time.time()) * 0.5
-
-        self.scroll_velocity *= drag_factor
         await self.page.mouse.move(self.mouse_x, self.mouse_y)
 
-
-    async def fluid_glide(self, start_y, end_y, max_duration):
-        self.scroll_y = start_y
+    async def smooth_scroll_to(self, target_y, duration):
+        """
+        Scrolls to target_y over 'duration' seconds with ease-in-out.
+        Never truly stops - maintains a flowing, natural rhythm.
+        """
+        start_y = self.scroll_y
         start_time = time.time()
-        dist = end_y - start_y
-        base_velocity = dist / (max_duration * 30)
-        self.scroll_velocity = base_velocity
+        distance = target_y - start_y
         
         while True:
             elapsed = time.time() - start_time
-            if elapsed > max_duration: break
-            if self.scroll_y >= end_y - 10: break
+            if elapsed >= duration:
+                break
             
-            if self.current_focus is None:
-                if self.scroll_velocity < base_velocity:
-                    self.scroll_velocity += 0.5
-                elif self.scroll_velocity > base_velocity:
-                    self.scroll_velocity -= 0.1
+            # Eased progress
+            t = elapsed / duration
+            eased_t = ease_in_out_quad(t)
             
-            await self.update_physics()
+            # Current scroll position
+            self.scroll_y = start_y + distance * eased_t
+            
+            # Apply scroll
+            await self.frame.evaluate(f"window.scrollTo(0, {self.scroll_y})")
+            
+            # Organic mouse movement
+            await self.organic_mouse_update(elapsed)
+            
             await asyncio.sleep(self.DT)
         
-        await self.frame.evaluate(f"window.scrollTo(0, {end_y})")
+        # Final snap
+        self.scroll_y = target_y
+        await self.frame.evaluate(f"window.scrollTo(0, {target_y})")
 
-
-async def choreography_script(page, frame, input_sys):
-    print(">> AI Director: Human Attention Scan...")
-    
-    targets = await frame.evaluate("""() => {
-        const candidates = document.querySelectorAll('button, a.btn, .card, .project-item, img, h2');
-        const results = [];
-        candidates.forEach(el => {
-            const r = el.getBoundingClientRect();
-            if(r.height < 50 || r.width < 50) return; 
-            results.push({
-                tag: el.tagName,
-                x: r.left + r.width/2,
-                y: r.top + window.scrollY + r.height/2 // Abs Y
-            });
-        });
-        return results.sort((a,b) => a.y - b.y);
-    }""")
-    
-    filtered = []
-    last_y = -999
-    for t in targets:
-        if t['y'] - last_y > 400: 
-            filtered.append(t)
-            last_y = t['y']
+    async def glide_with_pauses(self, max_scroll, total_duration, pause_points=[]):
+        """
+        Main scrolling choreography:
+        - Smoothly scrolls from 0 to max_scroll
+        - Pauses briefly at specified Y coordinates (pause_points)
+        - Each pause includes natural "reading" behavior
+        """
+        start_time = time.time()
+        current_y = 0
+        
+        # Sort and filter pause points
+        pause_points = sorted([p for p in pause_points if 0 < p < max_scroll])
+        pause_points.append(max_scroll) # Always end at bottom
+        
+        # Calculate time per segment
+        num_segments = len(pause_points)
+        scroll_time_per_segment = (total_duration * 0.7) / num_segments # 70% scrolling
+        pause_time_per_point = (total_duration * 0.3) / max(1, num_segments - 1) # 30% pausing
+        
+        for i, target_y in enumerate(pause_points):
+            print(f"   > Scrolling to Y={int(target_y)}...")
             
-    input_sys.targets = filtered
-    print(f">> Identified {len(filtered)} Attention Magnets.")
+            # Scroll to target
+            await self.smooth_scroll_to(target_y, scroll_time_per_segment)
+            
+            # Pause and "read" (except at the very end)
+            if i < len(pause_points) - 1 and pause_time_per_point > 0.5:
+                print(f"   > Reading at Y={int(target_y)}...")
+                await self.reading_behavior(pause_time_per_point)
+            
+            current_y = target_y
     
+    async def reading_behavior(self, duration):
+        """
+        Simulates a human pausing to read/look at content.
+        - Mouse drifts slowly across the visible area
+        - Occasional micro-scrolls (tiny movements)
+        """
+        start_time = time.time()
+        start_scroll_y = self.scroll_y
+        
+        while time.time() - start_time < duration:
+            elapsed = time.time() - start_time
+            
+            # Slow drift pattern
+            drift_x = math.sin(elapsed * 0.8) * 80
+            drift_y = math.sin(elapsed * 0.5 + 0.7) * 40
+            
+            self.mouse_x = 540 + drift_x
+            self.mouse_y = 800 + drift_y
+            
+            await self.page.mouse.move(self.mouse_x, self.mouse_y)
+            
+            # Occasional micro-scroll (human "settling")
+            if random.random() < 0.05:
+                micro = random.uniform(-5, 5)
+                self.scroll_y = start_scroll_y + micro
+                await self.frame.evaluate(f"window.scrollTo(0, {self.scroll_y})")
+            
+            await asyncio.sleep(self.DT)
+
+
+async def choreography_script(page, frame, scroller):
+    print(">> Refined Human Scrolling...")
+    
+    # Get page dimensions
     total_height = await frame.evaluate("document.body.scrollHeight")
     viewport_h = await frame.evaluate("window.innerHeight")
-    max_scroll = total_height - viewport_h
+    max_scroll = max(0, total_height - viewport_h)
     
+    # Find interesting pause points (sections, headings)
+    pause_points = await frame.evaluate("""() => {
+        const points = [];
+        const sections = document.querySelectorAll('section, .section, h2, .project-item');
+        sections.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            const absY = rect.top + window.scrollY;
+            if(absY > 500) points.push(absY - 200); // Stop 200px before so it's visible
+        });
+        return points;
+    }""")
+    
+    # Limit pause points to 3-4 max for good pacing
+    if len(pause_points) > 4:
+        step = len(pause_points) // 4
+        pause_points = [pause_points[i] for i in range(0, len(pause_points), step)][:4]
+    
+    print(f">> Found {len(pause_points)} sections to highlight.")
+    
+    # --- ACT 1: HERO (Initial view, 5s) ---
     print(">> Act 1: Hero")
-    input_sys.scroll_y = 0
-    await input_sys.page.mouse.move(540, 500)
-    for i in range(60): 
-        await input_sys.update_physics()
-        await asyncio.sleep(input_sys.DT)
-        
-    print(">> Act 2: Fluid Glide")
-    await input_sys.fluid_glide(0, max_scroll, max_duration=45.0)
-
-    print(">> Act 3: Footer Check")
-    for i in range(90): 
-        await input_sys.update_physics()
-        await asyncio.sleep(input_sys.DT)
+    await scroller.reading_behavior(4.0)
+    
+    # --- ACT 2: MAIN GLIDE (45s) ---
+    print(">> Act 2: Glide")
+    await scroller.glide_with_pauses(max_scroll, total_duration=42.0, pause_points=pause_points)
+    
+    # --- ACT 3: FOOTER (5s) ---
+    print(">> Act 3: Footer")
+    await scroller.reading_behavior(4.0)
 
 
 async def record_url(file_path: str, duration: float, output_path: str, overlay_text: str = "", overlay_header: str = "", cta_text: str = "", cta_subtext: str = ""):
     rel_path = os.path.relpath(file_path, SERVER_ROOT)
-    # Use Global SERVER_PORT
     target_url = f"http://localhost:{SERVER_PORT}/{rel_path.replace(os.sep, '/')}"
     print(f"Recording URL: {target_url}")
 
@@ -256,11 +295,11 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
         await content_frame.add_style_tag(content="::-webkit-scrollbar { display: none; } body { -ms-overflow-style: none; scrollbar-width: none; }")
         wrapper_offset = await page.evaluate("() => { const r = document.getElementById('presentation-window').getBoundingClientRect(); return {x:r.left, y:r.top}; }")
         
-        inputs = AttentionInput(page, content_frame, wrapper_offset, SCALE_FACTOR)
+        scroller = HumanScroller(page, content_frame, wrapper_offset, SCALE_FACTOR)
         await page.mouse.move(540, 960)
         
         try:
-            await asyncio.wait_for(choreography_script(page, content_frame, inputs), timeout=65.0)
+            await asyncio.wait_for(choreography_script(page, content_frame, scroller), timeout=60.0)
         except asyncio.TimeoutError:
             print("(!) Video Limit Reached.")
             
@@ -272,12 +311,12 @@ async def record_url(file_path: str, duration: float, output_path: str, overlay_
             if os.path.exists(output_path): os.remove(output_path)
             import shutil
             shutil.move(saved, output_path)
+            print(f"Video saved to {output_path}")
 
 if __name__ == "__main__":
     t = run_server_in_thread()
-    # Wait for server to be ready with port
     if SERVER_READY.wait(timeout=5):
-        time.sleep(1) # Extra buffer
+        time.sleep(1)
         test_html = os.path.abspath(os.path.join(os.path.dirname(__file__), "../content_pool/business_01/index.html"))
         asyncio.run(record_url(test_html, 55, "test_output.mp4"))
     else:
